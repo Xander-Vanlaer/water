@@ -1464,20 +1464,20 @@ async function editUserRole(userId) {
                 filteredHospitals = hospitals.filter(h => h.region_id === parseInt(selectedRegionId));
             }
             
+            // Ensure currentHospitalId is a number for comparison
+            const hospitalIdNum = currentHospitalId ? parseInt(currentHospitalId) : null;
+            
             // Update hospital dropdown
             hospitalSelect.innerHTML = `
                 <option value="">None</option>
-                ${filteredHospitals.map(h => `<option value="${h.id}" ${currentHospitalId === h.id ? 'selected' : ''}>${escapeHtml(h.name)}</option>`).join('')}
+                ${filteredHospitals.map(h => `<option value="${h.id}" ${hospitalIdNum === h.id ? 'selected' : ''}>${escapeHtml(h.name)}</option>`).join('')}
             `;
             
             // If current hospital is not in filtered list, it will be automatically reset to "None"
         }
         
-        // Apply initial filter based on user's current region
-        const currentRegionId = user.region_id;
-        if (currentRegionId) {
-            updateHospitalDropdown(currentRegionId, user.hospital_id);
-        }
+        // Apply initial filter - always call to ensure consistent behavior
+        updateHospitalDropdown(user.region_id, user.hospital_id);
         
         // Add event listener for region dropdown changes
         document.getElementById('edit-user-region').addEventListener('change', (e) => {

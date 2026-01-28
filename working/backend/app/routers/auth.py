@@ -44,7 +44,7 @@ async def register(
         for entry in domain_entries:
             # entry.email is like '@example.com'
             # Extract the domain part from user's email (everything after @)
-            user_domain = user_data.email.split('@', 1)[1] if '@' in user_data.email else ''
+            user_domain = user_data.email.split('@', 1)[1]
             whitelisted_domain = entry.email[1:]  # Remove leading '@' from whitelist entry
             
             # Check if user's domain ends with the whitelisted domain
