@@ -1454,6 +1454,38 @@ async function editUserRole(userId) {
 
         modal.style.display = 'block';
 
+        // Function to update hospital dropdown based on selected region
+        function updateHospitalDropdown(selectedRegionId, currentHospitalId) {
+            const hospitalSelect = document.getElementById('edit-user-hospital');
+            
+            // Filter hospitals by region
+            let filteredHospitals = hospitals;
+            if (selectedRegionId) {
+                filteredHospitals = hospitals.filter(h => h.region_id === parseInt(selectedRegionId));
+            }
+            
+            // Ensure currentHospitalId is a number for comparison
+            const hospitalIdNum = currentHospitalId ? parseInt(currentHospitalId) : null;
+            
+            // Update hospital dropdown
+            hospitalSelect.innerHTML = `
+                <option value="">None</option>
+                ${filteredHospitals.map(h => `<option value="${h.id}" ${hospitalIdNum === h.id ? 'selected' : ''}>${escapeHtml(h.name)}</option>`).join('')}
+            `;
+            
+            // If current hospital is not in filtered list, it will be automatically reset to "None"
+        }
+        
+        // Apply initial filter - always call to ensure consistent behavior
+        updateHospitalDropdown(user.region_id, user.hospital_id);
+        
+        // Add event listener for region dropdown changes
+        document.getElementById('edit-user-region').addEventListener('change', (e) => {
+            const selectedRegionId = e.target.value;
+            const currentHospitalSelection = document.getElementById('edit-user-hospital').value;
+            updateHospitalDropdown(selectedRegionId, currentHospitalSelection);
+        });
+
         // Save button handler
         document.getElementById('save-user-role-btn').addEventListener('click', async () => {
             const newRole = parseInt(document.getElementById('edit-user-role').value);
