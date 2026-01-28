@@ -1,0 +1,476 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard - Secure App</title>
+    <link rel="stylesheet" href="css/style.css">
+    <style>
+        .stat-item {
+            background: #f5f5f5;
+            padding: 1rem;
+            border-radius: 8px;
+            text-align: center;
+            margin: 0.5rem;
+        }
+        .stat-number {
+            font-size: 2rem;
+            font-weight: bold;
+            color: #4CAF50;
+            margin: 0.5rem 0;
+        }
+        .data-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 1rem;
+        }
+        .data-table th,
+        .data-table td {
+            padding: 0.75rem;
+            text-align: left;
+            border-bottom: 1px solid #ddd;
+        }
+        .data-table th {
+            background-color: #f5f5f5;
+            font-weight: 600;
+        }
+        .data-table tr:hover {
+            background-color: #f9f9f9;
+        }
+        .list-item {
+            padding: 0.75rem;
+            border-bottom: 1px solid #eee;
+        }
+        .list-item:last-child {
+            border-bottom: none;
+        }
+        .btn-small {
+            padding: 0.25rem 0.5rem;
+            font-size: 0.875rem;
+        }
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+            margin: 1rem 0;
+        }
+        .modal {
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            overflow: auto;
+            background-color: rgba(0,0,0,0.4);
+        }
+        .modal-content {
+            background-color: #fefefe;
+            margin: 5% auto;
+            padding: 2rem;
+            border: 1px solid #888;
+            border-radius: 8px;
+            width: 80%;
+            max-width: 800px;
+            max-height: 80vh;
+            overflow-y: auto;
+        }
+        .modal-close {
+            color: #aaa;
+            float: right;
+            font-size: 28px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+        .modal-close:hover,
+        .modal-close:focus {
+            color: #000;
+        }
+        .status-badge {
+            display: inline-block;
+            padding: 0.25rem 0.5rem;
+            border-radius: 4px;
+            font-size: 0.875rem;
+            font-weight: 600;
+        }
+        .status-active {
+            background-color: #d4edda;
+            color: #155724;
+        }
+        .status-inactive {
+            background-color: #f8d7da;
+            color: #721c24;
+        }
+        .sensor-row {
+            cursor: pointer;
+        }
+        .sensor-row:hover {
+            background-color: #e8f5e9 !important;
+        }
+        .form-group {
+            margin-bottom: 1rem;
+        }
+        .form-group label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-weight: 600;
+        }
+        .form-group input,
+        .form-group select,
+        .form-group textarea {
+            width: 100%;
+            padding: 0.5rem;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 1rem;
+        }
+        .success-message {
+            background-color: #d4edda;
+            border: 1px solid #c3e6cb;
+            color: #155724;
+            padding: 1rem;
+            border-radius: 4px;
+            margin: 1rem 0;
+        }
+    </style>
+</head>
+<body>
+    <nav class="navbar">
+        <div class="nav-container">
+            <h1>Secure Application</h1>
+            <div class="nav-actions">
+                <span id="user-info"></span>
+                <button id="logout-btn" class="btn btn-secondary">Logout</button>
+            </div>
+        </div>
+    </nav>
+    
+    <div class="container">
+        <div class="dashboard">
+            <div class="card">
+                <h2>User Information</h2>
+                <div id="user-details"></div>
+            </div>
+            
+            <div class="card">
+                <h2>Two-Factor Authentication</h2>
+                <div id="2fa-section">
+                    <div id="2fa-disabled" style="display: none;">
+                        <p>Two-factor authentication is currently disabled.</p>
+                        <button id="enable-2fa-btn" class="btn btn-primary">Enable 2FA</button>
+                    </div>
+                    
+                    <div id="2fa-enabled" style="display: none;">
+                        <p>Two-factor authentication is enabled for your account.</p>
+                        <button id="disable-2fa-btn" class="btn btn-danger">Disable 2FA</button>
+                    </div>
+                    
+                    <div id="2fa-setup" style="display: none;">
+                        <h3>Set up 2FA</h3>
+                        <p>Scan this QR code with your authenticator app (Google Authenticator, Authy, etc.)</p>
+                        <div id="qr-code-container"></div>
+                        <div class="form-group">
+                            <label>Manual entry code (if you can't scan):</label>
+                            <code id="totp-secret"></code>
+                        </div>
+                        <button id="close-2fa-setup" class="btn btn-secondary">Close</button>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Pending User Section -->
+            <div id="pending-user-section" class="card" style="display: none;">
+                <h2>Account Pending Approval</h2>
+                <div style="padding: 2rem; text-align: center;">
+                    <p style="font-size: 1.1rem; margin-bottom: 1rem;">Your account is pending approval.</p>
+                    <p>Please contact an administrator to activate your account:</p>
+                    <p><strong>Email:</strong> <a href="mailto:admin@example.com">admin@example.com</a></p>
+                    <p style="margin-top: 1rem; color: #888;">You currently have read-only access to your profile.</p>
+                </div>
+            </div>
+            
+            <!-- Admin Dashboard Section -->
+            <div id="admin-section" style="display: none;">
+                <!-- Quick Actions -->
+                <div class="card">
+                    <h2>Quick Links</h2>
+                    <div style="display: flex; gap: 1rem; flex-wrap: wrap;">
+                        <a href="api-docs.html" class="btn btn-primary" target="_blank">📖 API Documentation</a>
+                        <button id="refresh-all-btn" class="btn btn-secondary">🔄 Refresh All Data</button>
+                    </div>
+                </div>
+
+                <!-- System Stats -->
+                <div class="card">
+                    <h2>System Overview</h2>
+                    <div id="admin-stats" class="stats-grid"></div>
+                </div>
+
+                <!-- Sensor Overview Panel -->
+                <div class="card">
+                    <h2>🌡️ Sensor Data Monitoring</h2>
+                    <div id="sensor-stats" class="stats-grid" style="margin-bottom: 1rem;"></div>
+                    
+                    <!-- Filters -->
+                    <div style="display: flex; gap: 1rem; margin-bottom: 1rem; flex-wrap: wrap;">
+                        <div class="form-group" style="flex: 1; min-width: 200px;">
+                            <label for="sensor-hospital-filter">Filter by Hospital</label>
+                            <select id="sensor-hospital-filter">
+                                <option value="">All Hospitals</option>
+                            </select>
+                        </div>
+                        <div class="form-group" style="flex: 1; min-width: 200px;">
+                            <label for="sensor-region-filter">Filter by Region</label>
+                            <select id="sensor-region-filter">
+                                <option value="">All Regions</option>
+                            </select>
+                        </div>
+                        <div class="form-group" style="flex: 1; min-width: 200px;">
+                            <label for="sensor-search">Search Sensor ID</label>
+                            <input type="text" id="sensor-search" placeholder="Enter sensor ID...">
+                        </div>
+                        <div class="form-group" style="display: flex; align-items: flex-end;">
+                            <button id="sensor-filter-btn" class="btn btn-primary">Apply Filters</button>
+                        </div>
+                    </div>
+                    
+                    <div id="sensors-overview"></div>
+                </div>
+                
+                <!-- User Management -->
+                <div class="card">
+                    <h2>👥 User Management</h2>
+                    <div id="admin-users-list"></div>
+                </div>
+                
+                <!-- Region Management -->
+                <div class="card">
+                    <h2>🌍 Region Management</h2>
+                    <button id="add-region-btn" class="btn btn-primary" style="margin-bottom: 1rem;">➕ Add New Region</button>
+                    
+                    <!-- Add Region Form -->
+                    <div id="add-region-form" style="display: none; margin-bottom: 1rem; padding: 1rem; background: #f5f5f5; border-radius: 4px;">
+                        <h3>Create New Region</h3>
+                        <div class="form-group">
+                            <label for="region-name">Region Name *</label>
+                            <input type="text" id="region-name" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="region-code">Region Code *</label>
+                            <input type="text" id="region-code" required placeholder="e.g., NORTH, SOUTH">
+                        </div>
+                        <button id="save-region-btn" class="btn btn-success">Save Region</button>
+                        <button id="cancel-region-btn" class="btn btn-secondary">Cancel</button>
+                    </div>
+
+                    <!-- Edit Region Form -->
+                    <div id="edit-region-form" style="display: none; margin-bottom: 1rem; padding: 1rem; background: #f5f5f5; border-radius: 4px;">
+                        <h3>Edit Region</h3>
+                        <input type="hidden" id="edit-region-id">
+                        <div class="form-group">
+                            <label for="edit-region-name">Region Name *</label>
+                            <input type="text" id="edit-region-name" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="edit-region-code">Region Code *</label>
+                            <input type="text" id="edit-region-code" required>
+                        </div>
+                        <button id="update-region-btn" class="btn btn-success">Update Region</button>
+                        <button id="cancel-edit-region-btn" class="btn btn-secondary">Cancel</button>
+                    </div>
+                    
+                    <div id="regions-list"></div>
+                </div>
+                
+                <!-- Hospital Management -->
+                <div class="card">
+                    <h2>🏥 Hospital Management</h2>
+                    <button id="add-hospital-btn" class="btn btn-primary" style="margin-bottom: 1rem;">➕ Add New Hospital</button>
+                    
+                    <!-- Add Hospital Form -->
+                    <div id="add-hospital-form" style="display: none; margin-bottom: 1rem; padding: 1rem; background: #f5f5f5; border-radius: 4px;">
+                        <h3>Create New Hospital</h3>
+                        <div class="form-group">
+                            <label for="hospital-name">Hospital Name *</label>
+                            <input type="text" id="hospital-name" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="hospital-code">Hospital Code *</label>
+                            <input type="text" id="hospital-code" required placeholder="e.g., NGH, SRH">
+                        </div>
+                        <div class="form-group">
+                            <label for="hospital-region">Region *</label>
+                            <select id="hospital-region" required>
+                                <option value="">Select a region...</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="hospital-address">Address (Optional)</label>
+                            <textarea id="hospital-address" rows="3"></textarea>
+                        </div>
+                        <button id="save-hospital-btn" class="btn btn-success">Save Hospital</button>
+                        <button id="cancel-hospital-btn" class="btn btn-secondary">Cancel</button>
+                    </div>
+
+                    <!-- Edit Hospital Form -->
+                    <div id="edit-hospital-form" style="display: none; margin-bottom: 1rem; padding: 1rem; background: #f5f5f5; border-radius: 4px;">
+                        <h3>Edit Hospital</h3>
+                        <input type="hidden" id="edit-hospital-id">
+                        <div class="form-group">
+                            <label for="edit-hospital-name">Hospital Name *</label>
+                            <input type="text" id="edit-hospital-name" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="edit-hospital-code">Hospital Code *</label>
+                            <input type="text" id="edit-hospital-code" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="edit-hospital-region">Region *</label>
+                            <select id="edit-hospital-region" required>
+                                <option value="">Select a region...</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="edit-hospital-address">Address (Optional)</label>
+                            <textarea id="edit-hospital-address" rows="3"></textarea>
+                        </div>
+                        <button id="update-hospital-btn" class="btn btn-success">Update Hospital</button>
+                        <button id="cancel-edit-hospital-btn" class="btn btn-secondary">Cancel</button>
+                    </div>
+                    
+                    <div id="hospitals-list"></div>
+                </div>
+
+                <!-- API Keys Management -->
+                <div class="card">
+                    <h2>🔑 API Keys Management</h2>
+                    <button id="add-api-key-btn" class="btn btn-primary" style="margin-bottom: 1rem;">➕ Generate New API Key</button>
+                    
+                    <!-- Generate API Key Form -->
+                    <div id="add-api-key-form" style="display: none; margin-bottom: 1rem; padding: 1rem; background: #f5f5f5; border-radius: 4px;">
+                        <h3>Generate API Key</h3>
+                        <div class="form-group">
+                            <label for="api-key-sensor-id">Sensor ID *</label>
+                            <input type="text" id="api-key-sensor-id" placeholder="e.g., HOSP001-TEMP-001" required>
+                            <small style="color: #666;">Unique identifier for this sensor (e.g., HOSPITAL_CODE-SENSOR_TYPE-NUMBER)</small>
+                        </div>
+                        <div class="form-group">
+                            <label for="api-key-hospital">Hospital *</label>
+                            <select id="api-key-hospital" required>
+                                <option value="">Select a hospital...</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="api-key-description">Description (Optional)</label>
+                            <input type="text" id="api-key-description" placeholder="e.g., Temperature sensor in Ward A">
+                        </div>
+                        <button id="save-api-key-btn" class="btn btn-success">Generate Key</button>
+                        <button id="cancel-api-key-btn" class="btn btn-secondary">Cancel</button>
+                    </div>
+
+                    <div id="api-keys-list"></div>
+                </div>
+                
+                <!-- Email Whitelist Management -->
+                <div class="card">
+                    <h2>📧 Email Whitelist Management</h2>
+                    <p style="color: #666; margin-bottom: 1rem;">Only whitelisted emails can register new accounts.</p>
+                    <button id="add-email-btn" class="btn btn-primary" style="margin-bottom: 1rem;">➕ Add Email to Whitelist</button>
+                    
+                    <!-- Add Email Form -->
+                    <div id="add-email-form" style="display: none; margin-bottom: 1rem; padding: 1rem; background: #f5f5f5; border-radius: 4px;">
+                        <h3>Add Email to Whitelist</h3>
+                        <div class="form-group">
+                            <label for="whitelist-email">Email Address or Domain *</label>
+                            <input type="text" id="whitelist-email" placeholder="user@example.com or @domain.com" required>
+                        </div>
+                        <button id="save-email-btn" class="btn btn-success">Add Email</button>
+                        <button id="cancel-email-btn" class="btn btn-secondary">Cancel</button>
+                    </div>
+
+                    <div id="allowed-emails-list"></div>
+                </div>
+            </div>
+            
+            <!-- Region Admin Dashboard Section -->
+            <div id="region-admin-section" style="display: none;">
+                <div class="card">
+                    <h2>Region Admin Dashboard</h2>
+                    <div id="region-admin-stats" class="stats-grid"></div>
+                </div>
+                
+                <div class="card">
+                    <h2>Users in Your Region</h2>
+                    <div id="region-users-list"></div>
+                </div>
+                
+                <div class="card">
+                    <h2>Hospitals in Your Region</h2>
+                    <div id="region-hospitals-list"></div>
+                </div>
+                
+                <div class="card">
+                    <h2>Recent Sensor Data</h2>
+                    <div id="region-sensor-data"></div>
+                </div>
+            </div>
+            
+            <!-- Hospital User Dashboard Section -->
+            <div id="hospital-user-section" style="display: none;">
+                <div class="card">
+                    <h2>Hospital Dashboard</h2>
+                    <div id="hospital-stats" class="stats-grid"></div>
+                </div>
+                
+                <div class="card">
+                    <h2>Sensor Data for Your Hospital</h2>
+                    <div id="hospital-sensor-data"></div>
+                </div>
+            </div>
+            
+            <!-- Data Management (for all users except pending) -->
+            <div id="data-management" class="card" style="display: none;">
+                <h2>Your Data</h2>
+                <button id="add-data-btn" class="btn btn-primary">Add New Item</button>
+                
+                <div id="add-data-form" style="display: none; margin-top: 1rem;">
+                    <div class="form-group">
+                        <label for="data-title">Title</label>
+                        <input type="text" id="data-title" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="data-content">Content</label>
+                        <textarea id="data-content" rows="4" required></textarea>
+                    </div>
+                    <button id="save-data-btn" class="btn btn-success">Save</button>
+                    <button id="cancel-data-btn" class="btn btn-secondary">Cancel</button>
+                </div>
+                
+                <div id="data-list"></div>
+                <div id="error-message" class="error-message" style="display: none;"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal for Sensor Details -->
+    <div id="sensor-modal" class="modal" style="display: none;">
+        <div class="modal-content">
+            <span class="modal-close">&times;</span>
+            <h2>Sensor Details</h2>
+            <div id="sensor-modal-content"></div>
+        </div>
+    </div>
+
+    <!-- Modal for User Role Edit -->
+    <div id="user-role-modal" class="modal" style="display: none;">
+        <div class="modal-content">
+            <span class="modal-close">&times;</span>
+            <h2>Edit User Role & Assignment</h2>
+            <div id="user-role-modal-content"></div>
+        </div>
+    </div>
+    
+    <script src="js/auth.js"></script>
+    <script src="js/main.js"></script>
+</body>
+</html>

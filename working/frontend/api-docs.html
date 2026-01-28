@@ -1,0 +1,610 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>API Documentation - Orange Pi Integration</title>
+    <link rel="stylesheet" href="css/style.css">
+    <style>
+        .doc-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+        .doc-section {
+            margin-bottom: 2rem;
+        }
+        .doc-section h2 {
+            color: #333;
+            border-bottom: 2px solid #4CAF50;
+            padding-bottom: 0.5rem;
+            margin-bottom: 1rem;
+        }
+        .doc-section h3 {
+            color: #555;
+            margin-top: 1.5rem;
+            margin-bottom: 0.75rem;
+        }
+        .code-block {
+            background-color: #f5f5f5;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            padding: 1rem;
+            margin: 1rem 0;
+            overflow-x: auto;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9rem;
+        }
+        .code-block pre {
+            margin: 0;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+        .endpoint {
+            background-color: #e8f5e9;
+            border-left: 4px solid #4CAF50;
+            padding: 1rem;
+            margin: 1rem 0;
+        }
+        .endpoint .method {
+            display: inline-block;
+            background-color: #4CAF50;
+            color: white;
+            padding: 0.25rem 0.5rem;
+            border-radius: 4px;
+            font-weight: bold;
+            margin-right: 0.5rem;
+        }
+        .endpoint .method.delete {
+            background-color: #f44336;
+        }
+        .endpoint .method.put {
+            background-color: #ff9800;
+        }
+        .endpoint .method.get {
+            background-color: #2196F3;
+        }
+        .endpoint .url {
+            font-family: 'Courier New', monospace;
+            font-weight: bold;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 1rem 0;
+        }
+        table th,
+        table td {
+            padding: 0.75rem;
+            text-align: left;
+            border-bottom: 1px solid #ddd;
+        }
+        table th {
+            background-color: #f5f5f5;
+            font-weight: 600;
+        }
+        .nav-link {
+            margin-bottom: 1rem;
+        }
+        .nav-link a {
+            color: #4CAF50;
+            text-decoration: none;
+        }
+        .nav-link a:hover {
+            text-decoration: underline;
+        }
+        .warning {
+            background-color: #fff3cd;
+            border-left: 4px solid #ffc107;
+            padding: 1rem;
+            margin: 1rem 0;
+        }
+        .info {
+            background-color: #d1ecf1;
+            border-left: 4px solid #0c5460;
+            padding: 1rem;
+            margin: 1rem 0;
+        }
+    </style>
+</head>
+<body>
+    <nav class="navbar">
+        <div class="nav-container">
+            <h1>API Documentation</h1>
+            <div class="nav-actions">
+                <a href="index.html" class="btn btn-secondary">Back to Dashboard</a>
+            </div>
+        </div>
+    </nav>
+    
+    <div class="doc-container">
+        <div class="nav-link">
+            <a href="index.html">← Back to Dashboard</a>
+        </div>
+
+        <h1>Orange Pi Sensor Integration Guide</h1>
+        
+        <div class="info">
+            <strong>Note:</strong> This guide is for integrating Orange Pi or other IoT devices with the sensor data API. 
+            You need an API key to send sensor data. Contact your system administrator to generate an API key for your hospital.
+        </div>
+
+        <!-- Authentication Section -->
+        <div class="doc-section">
+            <h2 id="authentication">1. Authentication</h2>
+            
+            <h3>API Key Authentication</h3>
+            <p>All sensor data submissions require API key authentication using the <code>X-API-Key</code> header.</p>
+            
+            <h4>How to Get an API Key</h4>
+            <ol>
+                <li>Contact your system administrator (Admin role required)</li>
+                <li>Admin generates an API key for your hospital via the admin dashboard</li>
+                <li>You receive an API key in the format: <code>sk_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx</code></li>
+                <li>Store this key securely - it will only be shown once!</li>
+            </ol>
+            
+            <div class="warning">
+                <strong>Security Warning:</strong> Never commit API keys to version control or share them publicly. 
+                Treat your API key like a password.
+            </div>
+            
+            <h4>API Key Format</h4>
+            <div class="code-block">
+                <pre>X-API-Key: sk_your_api_key_here</pre>
+            </div>
+        </div>
+
+        <!-- Endpoints Section -->
+        <div class="doc-section">
+            <h2 id="endpoints">2. API Endpoints</h2>
+            
+            <div class="endpoint">
+                <span class="method">POST</span>
+                <span class="url">/api/sensors/data</span>
+                <p><strong>Description:</strong> Submit sensor data reading from IoT device</p>
+                <p><strong>Authentication:</strong> API Key (X-API-Key header)</p>
+                <p><strong>Rate Limit:</strong> 100 requests per minute</p>
+            </div>
+
+            <h3>Request Headers</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Header</th>
+                        <th>Value</th>
+                        <th>Required</th>
+                        <th>Description</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><code>X-API-Key</code></td>
+                        <td>Your API key</td>
+                        <td>Yes</td>
+                        <td>API key for authentication</td>
+                    </tr>
+                    <tr>
+                        <td><code>Content-Type</code></td>
+                        <td>application/json</td>
+                        <td>Yes</td>
+                        <td>Request body format</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <h3>Request Body Schema</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Field</th>
+                        <th>Type</th>
+                        <th>Required</th>
+                        <th>Description</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><code>sensor_id</code></td>
+                        <td>string</td>
+                        <td>Yes</td>
+                        <td>Unique identifier for the sensor (e.g., "OPI-001", "WARD-A-TEMP-01")</td>
+                    </tr>
+                    <tr>
+                        <td><code>temperature</code></td>
+                        <td>float</td>
+                        <td>No</td>
+                        <td>Temperature reading in Celsius</td>
+                    </tr>
+                    <tr>
+                        <td><code>humidity</code></td>
+                        <td>float</td>
+                        <td>No</td>
+                        <td>Humidity percentage (0-100)</td>
+                    </tr>
+                    <tr>
+                        <td><code>air_quality</code></td>
+                        <td>float</td>
+                        <td>No</td>
+                        <td>Air quality index</td>
+                    </tr>
+                    <tr>
+                        <td><code>timestamp</code></td>
+                        <td>datetime (ISO 8601)</td>
+                        <td>No</td>
+                        <td>Timestamp of reading (defaults to server time if not provided)</td>
+                    </tr>
+                    <tr>
+                        <td><code>custom_data</code></td>
+                        <td>object</td>
+                        <td>No</td>
+                        <td>Additional sensor data as JSON object (e.g., CO2, pressure, etc.)</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <h3>Example Request</h3>
+            <div class="code-block">
+                <pre>{
+  "sensor_id": "OPI-NGH-001",
+  "timestamp": "2026-01-28T10:30:00Z",
+  "temperature": 22.5,
+  "humidity": 45.0,
+  "air_quality": 85.0,
+  "custom_data": {
+    "pressure": 1013.25,
+    "co2": 400,
+    "location": "Ward A - Room 101"
+  }
+}</pre>
+            </div>
+
+            <h3>Success Response (201 Created)</h3>
+            <div class="code-block">
+                <pre>{
+  "id": 123,
+  "hospital_id": 1,
+  "sensor_id": "OPI-NGH-001",
+  "timestamp": "2026-01-28T10:30:00Z",
+  "temperature": 22.5,
+  "humidity": 45.0,
+  "air_quality": 85.0,
+  "data_json": {
+    "temperature": 22.5,
+    "humidity": 45.0,
+    "air_quality": 85.0,
+    "pressure": 1013.25,
+    "co2": 400,
+    "location": "Ward A - Room 101"
+  },
+  "created_at": "2026-01-28T10:30:05Z"
+}</pre>
+            </div>
+
+            <h3>Error Responses</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Status Code</th>
+                        <th>Description</th>
+                        <th>Example Response</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>401 Unauthorized</td>
+                        <td>Invalid or missing API key</td>
+                        <td><code>{"detail": "Invalid API key"}</code></td>
+                    </tr>
+                    <tr>
+                        <td>422 Unprocessable Entity</td>
+                        <td>Invalid request body</td>
+                        <td><code>{"detail": [{"loc": ["body", "sensor_id"], "msg": "field required"}]}</code></td>
+                    </tr>
+                    <tr>
+                        <td>429 Too Many Requests</td>
+                        <td>Rate limit exceeded</td>
+                        <td><code>{"detail": "Rate limit exceeded"}</code></td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Integration Examples Section -->
+        <div class="doc-section">
+            <h2 id="examples">3. Integration Examples</h2>
+            
+            <h3>Python Example (Recommended for Orange Pi)</h3>
+            <p>This example shows how to send sensor data from an Orange Pi using Python's <code>requests</code> library.</p>
+            
+            <div class="code-block">
+                <pre>#!/usr/bin/env python3
+"""
+Orange Pi Sensor Data Uploader
+Author: Your Hospital IT Department
+Description: Sends sensor readings to the hospital monitoring system
+"""
+
+import requests
+import json
+import time
+from datetime import datetime
+
+# Configuration
+API_URL = "http://your-server-ip:8000/api/sensors/data"
+API_KEY = "sk_your_api_key_here"  # Replace with your actual API key
+SENSOR_ID = "OPI-001"  # Unique ID for this sensor
+
+def read_sensors():
+    """
+    Read sensor values from connected sensors
+    Replace this with your actual sensor reading logic
+    """
+    # Example: Reading from DHT22 sensor
+    # import Adafruit_DHT
+    # humidity, temperature = Adafruit_DHT.read_retry(Adafruit_DHT.DHT22, 4)
+    
+    # Simulated values for demonstration
+    return {
+        "temperature": 22.5,
+        "humidity": 45.2,
+        "air_quality": 85
+    }
+
+def send_sensor_data(sensor_values):
+    """Send sensor data to the API"""
+    
+    # Prepare the data payload
+    data = {
+        "sensor_id": SENSOR_ID,
+        "timestamp": datetime.utcnow().isoformat() + "Z",
+        "temperature": sensor_values.get("temperature"),
+        "humidity": sensor_values.get("humidity"),
+        "air_quality": sensor_values.get("air_quality"),
+        "custom_data": {
+            "location": "Ward A",
+            "device_info": "Orange Pi Zero"
+        }
+    }
+    
+    # Prepare headers
+    headers = {
+        "X-API-Key": API_KEY,
+        "Content-Type": "application/json"
+    }
+    
+    try:
+        # Send POST request
+        response = requests.post(API_URL, json=data, headers=headers, timeout=10)
+        
+        # Check response
+        if response.status_code == 201:
+            print(f"✓ Data uploaded successfully at {datetime.now()}")
+            print(f"  Response: {response.json()}")
+            return True
+        else:
+            print(f"✗ Error: {response.status_code}")
+            print(f"  Details: {response.text}")
+            return False
+            
+    except requests.exceptions.RequestException as e:
+        print(f"✗ Connection error: {e}")
+        return False
+
+def main():
+    """Main loop - reads and sends sensor data periodically"""
+    print(f"Starting sensor data uploader for {SENSOR_ID}")
+    print(f"API URL: {API_URL}")
+    
+    # Verify API key is configured
+    if "your_api_key_here" in API_KEY:
+        print("ERROR: Please configure your API key in the script!")
+        return
+    
+    # Main loop
+    while True:
+        try:
+            # Read sensor values
+            sensor_values = read_sensors()
+            print(f"\nSensor readings: Temp={sensor_values['temperature']}°C, "
+                  f"Humidity={sensor_values['humidity']}%, "
+                  f"Air Quality={sensor_values['air_quality']}")
+            
+            # Send to API
+            send_sensor_data(sensor_values)
+            
+            # Wait 5 minutes before next reading
+            time.sleep(300)
+            
+        except KeyboardInterrupt:
+            print("\nShutting down...")
+            break
+        except Exception as e:
+            print(f"Error in main loop: {e}")
+            time.sleep(60)  # Wait 1 minute before retrying
+
+if __name__ == "__main__":
+    main()</pre>
+            </div>
+
+            <h3>Installation Instructions (Orange Pi)</h3>
+            <div class="code-block">
+                <pre># Install Python requests library
+pip3 install requests
+
+# For DHT22 sensor (temperature/humidity), install:
+pip3 install Adafruit_DHT
+
+# Make the script executable
+chmod +x sensor_uploader.py
+
+# Run the script
+python3 sensor_uploader.py
+
+# To run on startup, add to crontab:
+crontab -e
+# Add this line:
+@reboot /usr/bin/python3 /path/to/sensor_uploader.py >> /var/log/sensor.log 2>&1</pre>
+            </div>
+
+            <h3>cURL Example (For Testing)</h3>
+            <p>Quick test using command line:</p>
+            <div class="code-block">
+                <pre>curl -X POST http://your-server-ip:8000/api/sensors/data \
+  -H "X-API-Key: sk_your_api_key_here" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "sensor_id": "TEST-001",
+    "temperature": 22.5,
+    "humidity": 45.0,
+    "air_quality": 85.0,
+    "custom_data": {
+      "test": true
+    }
+  }'</pre>
+            </div>
+
+            <h3>JavaScript/Node.js Example</h3>
+            <div class="code-block">
+                <pre>const axios = require('axios');
+
+const API_URL = 'http://your-server-ip:8000/api/sensors/data';
+const API_KEY = 'sk_your_api_key_here';
+const SENSOR_ID = 'NODE-001';
+
+async function sendSensorData(readings) {
+    try {
+        const response = await axios.post(API_URL, {
+            sensor_id: SENSOR_ID,
+            timestamp: new Date().toISOString(),
+            temperature: readings.temperature,
+            humidity: readings.humidity,
+            air_quality: readings.airQuality,
+            custom_data: {
+                location: 'Ward B',
+                device: 'Node.js Client'
+            }
+        }, {
+            headers: {
+                'X-API-Key': API_KEY,
+                'Content-Type': 'application/json'
+            }
+        });
+        
+        console.log('✓ Data uploaded:', response.data);
+        return true;
+    } catch (error) {
+        console.error('✗ Upload failed:', error.message);
+        if (error.response) {
+            console.error('  Response:', error.response.data);
+        }
+        return false;
+    }
+}
+
+// Example usage
+sendSensorData({
+    temperature: 23.1,
+    humidity: 48.5,
+    airQuality: 90
+});</pre>
+            </div>
+        </div>
+
+        <!-- Best Practices Section -->
+        <div class="doc-section">
+            <h2 id="best-practices">4. Best Practices</h2>
+            
+            <h3>Security</h3>
+            <ul>
+                <li><strong>Never hardcode API keys</strong> - Use environment variables or configuration files</li>
+                <li><strong>Use HTTPS in production</strong> - Always encrypt data in transit</li>
+                <li><strong>Rotate API keys regularly</strong> - Request new keys periodically</li>
+                <li><strong>Monitor for unauthorized access</strong> - Review logs for suspicious activity</li>
+            </ul>
+
+            <h3>Reliability</h3>
+            <ul>
+                <li><strong>Implement retry logic</strong> - Handle temporary network failures</li>
+                <li><strong>Buffer data locally</strong> - Store readings if upload fails, retry later</li>
+                <li><strong>Monitor rate limits</strong> - Don't exceed 100 requests/minute</li>
+                <li><strong>Include timestamps</strong> - Always send reading time for accurate data</li>
+            </ul>
+
+            <h3>Data Quality</h3>
+            <ul>
+                <li><strong>Validate sensor readings</strong> - Check for reasonable ranges before sending</li>
+                <li><strong>Use unique sensor IDs</strong> - Format: LOCATION-TYPE-NUMBER (e.g., WARD-A-TEMP-01)</li>
+                <li><strong>Include metadata</strong> - Use custom_data for location, calibration info, etc.</li>
+                <li><strong>Consistent units</strong> - Always use Celsius for temperature</li>
+            </ul>
+        </div>
+
+        <!-- Troubleshooting Section -->
+        <div class="doc-section">
+            <h2 id="troubleshooting">5. Troubleshooting</h2>
+            
+            <h3>Common Issues</h3>
+            
+            <h4>401 Unauthorized - Invalid API Key</h4>
+            <ul>
+                <li>Verify API key is correct (check for extra spaces or characters)</li>
+                <li>Ensure API key hasn't been revoked</li>
+                <li>Check that X-API-Key header is set correctly</li>
+            </ul>
+
+            <h4>429 Too Many Requests</h4>
+            <ul>
+                <li>You're sending more than 100 requests per minute</li>
+                <li>Increase delay between readings (recommended: 5 minutes)</li>
+                <li>Check for multiple processes sending data</li>
+            </ul>
+
+            <h4>Connection Timeout</h4>
+            <ul>
+                <li>Verify server IP address and port</li>
+                <li>Check network connectivity from Orange Pi</li>
+                <li>Ensure firewall allows outbound HTTP/HTTPS</li>
+            </ul>
+
+            <h4>422 Validation Error</h4>
+            <ul>
+                <li>Check that sensor_id is provided (required field)</li>
+                <li>Verify JSON format is valid</li>
+                <li>Ensure numeric values are numbers, not strings</li>
+            </ul>
+        </div>
+
+        <!-- Support Section -->
+        <div class="doc-section">
+            <h2 id="support">6. Support & Resources</h2>
+            
+            <h3>API Documentation</h3>
+            <p>Full interactive API documentation is available at:</p>
+            <ul>
+                <li><a href="/api/docs" target="_blank">Swagger UI</a> - Interactive API explorer</li>
+                <li><a href="/api/redoc" target="_blank">ReDoc</a> - Alternative documentation view</li>
+            </ul>
+
+            <h3>System Status</h3>
+            <p>Check if the API is operational:</p>
+            <ul>
+                <li><a href="/health" target="_blank">Health Check Endpoint</a></li>
+            </ul>
+
+            <h3>Need Help?</h3>
+            <p>Contact your system administrator or IT department for:</p>
+            <ul>
+                <li>API key generation or issues</li>
+                <li>Hospital assignment questions</li>
+                <li>Network connectivity problems</li>
+                <li>Custom sensor integration requirements</li>
+            </ul>
+        </div>
+
+        <div class="nav-link" style="margin-top: 2rem;">
+            <a href="index.html">← Back to Dashboard</a>
+        </div>
+    </div>
+</body>
+</html>
