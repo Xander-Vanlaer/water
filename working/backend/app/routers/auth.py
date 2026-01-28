@@ -35,13 +35,24 @@ async def register(
     # Check if email is in whitelist (full email or domain)
     allowed_email = db.query(AllowedEmail).filter(AllowedEmail.email == user_data.email).first()
     
-    # If not found by full email, check by domain
+    # If not found by full email, check by domain wildcards
     if not allowed_email and '@' in user_data.email:
-        email_parts = user_data.email.split('@')
-        # Ensure valid email format (exactly one @ and content after it)
-        if len(email_parts) == 2 and email_parts[1]:
-            domain = '@' + email_parts[1]
-            allowed_email = db.query(AllowedEmail).filter(AllowedEmail.email == domain).first()
+        # Get all whitelisted entries that start with '@' (domain wildcards)
+        domain_entries = db.query(AllowedEmail).filter(AllowedEmail.email.like('@%')).all()
+        
+        # Check if user's email ends with any of the whitelisted domains
+        for entry in domain_entries:
+            # entry.email is like '@example.com'
+            # Extract the domain part from user's email (everything after @)
+            user_domain = user_data.email.split('@', 1)[1] if '@' in user_data.email else ''
+            whitelisted_domain = entry.email[1:]  # Remove leading '@' from whitelist entry
+            
+            # Check if user's domain ends with the whitelisted domain
+            # This allows both exact matches and subdomain matches
+            # e.g., 'example.com' matches 'example.com' and 'subdomain.example.com' matches 'example.com'
+            if user_domain == whitelisted_domain or user_domain.endswith('.' + whitelisted_domain):
+                allowed_email = entry
+                break
     
     if not allowed_email:
         raise HTTPException(
