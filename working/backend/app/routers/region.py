@@ -3,12 +3,13 @@ Region admin router for managing users and hospitals within their region
 """
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
+from sqlalchemy import func
 from typing import List
 from app.database import get_db
-from app.models import User, Hospital, SensorData
+from app.models import User, Hospital, SensorData, Region
 from app.schemas import (
     UserResponse, UserAssignment,
-    HospitalResponse, SensorDataResponse
+    HospitalResponse, SensorDataResponse, HospitalMapResponse
 )
 from app.dependencies import require_region_admin_or_admin
 
@@ -134,3 +135,57 @@ async def get_region_sensor_data(
         ).order_by(SensorData.timestamp.desc()).limit(limit).all()
     
     return sensor_data
+
+
+@router.get("/hospitals/map", response_model=List[HospitalMapResponse])
+async def get_region_hospitals_map_data(
+    current_user: User = Depends(require_region_admin_or_admin),
+    db: Session = Depends(get_db)
+):
+    """Get hospital map data for my region (region admin only)"""
+    # Subquery to get sensor count and latest reading per hospital
+    sensor_stats = db.query(
+        SensorData.hospital_id,
+        func.count(func.distinct(SensorData.sensor_id)).label('sensor_count'),
+        func.max(SensorData.timestamp).label('last_reading_time')
+    ).group_by(SensorData.hospital_id).subquery()
+    
+    # Main query for hospitals with region info
+    query = db.query(
+        Hospital,
+        Region.name.label('region_name'),
+        func.coalesce(sensor_stats.c.sensor_count, 0).label('sensor_count'),
+        sensor_stats.c.last_reading_time
+    ).join(
+        Region, Hospital.region_id == Region.id
+    ).outerjoin(
+        sensor_stats, Hospital.id == sensor_stats.c.hospital_id
+    )
+    
+    # Filter by region if user is region admin
+    if current_user.role != 2:  # Not admin
+        if not current_user.region_id:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Region admin must be assigned to a region"
+            )
+        query = query.filter(Hospital.region_id == current_user.region_id)
+    
+    results = query.all()
+    
+    # Build response
+    map_data = []
+    for hospital, region_name, sensor_count, last_reading_time in results:
+        map_data.append(HospitalMapResponse(
+            id=hospital.id,
+            name=hospital.name,
+            code=hospital.code,
+            latitude=hospital.latitude,
+            longitude=hospital.longitude,
+            sensor_count=sensor_count,
+            last_reading_time=last_reading_time,
+            region_id=hospital.region_id,
+            region_name=region_name
+        ))
+    
+    return map_data

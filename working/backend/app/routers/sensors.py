@@ -9,8 +9,10 @@ from app.database import get_db
 from app.models import User, Hospital, SensorData, APIKey
 from app.schemas import SensorDataCreate, SensorDataResponse
 from app.dependencies import verify_api_key, get_current_active_user
+from app.audit import log_sensor_data
 from slowapi import Limiter
 from slowapi.util import get_remote_address
+import random
 
 router = APIRouter(prefix="/api/sensors", tags=["Sensors"])
 limiter = Limiter(key_func=get_remote_address)
@@ -70,6 +72,11 @@ async def ingest_sensor_data(
     
     db.commit()
     db.refresh(db_sensor_data)
+    
+    # Log sensor data ingestion with sampling (only log 1 in every 100 readings to avoid log spam)
+    # This helps track sensor activity without overwhelming the audit log
+    if random.randint(1, 100) == 1:
+        log_sensor_data(db, sensor_data.sensor_id, api_key.hospital_id, data_count=100)
     
     return db_sensor_data
 
