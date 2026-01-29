@@ -126,18 +126,20 @@ The setup script will:
    docker compose exec backend alembic upgrade head
    ```
 
-5. **Seed sample data (Optional but recommended)**
+5. **Create admin account and setup domain whitelist (Required for first-time setup)**
    ```bash
-   docker compose exec backend python seed_data.py
+   # Create admin account
+   docker compose exec backend python create_admin.py
+   
+   # Add domain whitelist (optional but recommended)
+   docker compose exec backend python add_domain_whitelist.py
    ```
    
    This will create:
    - Admin user (username: `admin`, password: `Admin123!`)
-   - 3 regions (North, South, East)
-   - 6 hospitals across regions
-   - API keys for each hospital
-   - Sample sensor data
-   - Sample users for each role
+   - Whitelisted email domains: `@outlook.be` and `@gmail.com`
+   
+   **Note:** Users can only register with whitelisted email domains or specific whitelisted emails.
 
 ## 🌐 Access the Application
 
@@ -201,16 +203,19 @@ curl -X DELETE http://localhost:8000/api/admin/allowed-emails/{email_id} \
 6. You'll see a message about pending approval
 7. **New users start as "Pending" (role 1)** - Contact admin to get role assigned
 
-### Sample User Accounts (after running seed_data.py)
+### Default Admin Account (after running create_admin.py)
 
 | Username | Password | Role |
 |----------|----------|------|
 | admin | Admin123! | Admin |
-| region_admin_north | RegionAdmin123! | Region Admin (North) |
-| region_admin_south | RegionAdmin123! | Region Admin (South) |
-| hospital_user_ngh | Hospital123! | Hospital User (North General Hospital) |
-| hospital_user_srh | Hospital123! | Hospital User (South Regional Hospital) |
-| pending_user | Pending123! | Pending |
+
+**Important:** Change the default password immediately after first login!
+
+To create additional users:
+1. Login as admin
+2. Add their email addresses to the whitelist (via Admin Dashboard → Email Whitelist Management)
+3. Users can then register with their whitelisted email addresses
+4. Admin assigns roles and region/hospital access as needed
 
 ### Logging In
 
