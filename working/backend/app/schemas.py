@@ -3,7 +3,7 @@ Pydantic schemas for request/response validation
 """
 from pydantic import BaseModel, EmailStr, Field, validator
 from datetime import datetime
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, List
 
 
 class UserBase(BaseModel):
@@ -309,6 +309,15 @@ class AuditLogStatsResponse(BaseModel):
     top_users: list
     recent_critical_actions: list
     failed_logins_count: int
+
+
+class AuditLogsPaginatedResponse(BaseModel):
+    """Schema for paginated audit logs response with metadata"""
+    logs: List[AuditLogResponse]
+    total: int
+    
+    class Config:
+        from_attributes = True
 
 
 # Hospital Map Schemas

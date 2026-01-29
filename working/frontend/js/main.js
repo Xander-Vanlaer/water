@@ -1544,10 +1544,10 @@ async function loadAuditLogs() {
         // Get filter values from form inputs
         const startDate = document.getElementById('audit-start-date')?.value || '';
         const endDate = document.getElementById('audit-end-date')?.value || '';
-        const userId = document.getElementById('audit-user-id')?.value || '';
-        const action = document.getElementById('audit-action')?.value || '';
-        const resourceType = document.getElementById('audit-resource-type')?.value || '';
-        const status = document.getElementById('audit-status')?.value || '';
+        const userId = document.getElementById('audit-user-filter')?.value || '';
+        const action = document.getElementById('audit-action-filter')?.value || '';
+        const resourceType = document.getElementById('audit-resource-filter')?.value || '';
+        const status = document.getElementById('audit-status-filter')?.value || '';
         const limit = parseInt(document.getElementById('audit-limit')?.value) || 50;
         const offset = parseInt(document.getElementById('audit-offset')?.value) || 0;
         
@@ -1637,10 +1637,10 @@ async function clearAuditFilters() {
     const filterInputs = [
         'audit-start-date',
         'audit-end-date',
-        'audit-user-id',
-        'audit-action',
-        'audit-resource-type',
-        'audit-status'
+        'audit-user-filter',
+        'audit-action-filter',
+        'audit-resource-filter',
+        'audit-status-filter'
     ];
     
     filterInputs.forEach(id => {
@@ -1664,10 +1664,10 @@ async function loadAuditStats() {
         if (actionsToday) actionsToday.textContent = stats.actions_today || 0;
         
         const actionsWeek = document.getElementById('audit-actions-week');
-        if (actionsWeek) actionsWeek.textContent = stats.actions_week || 0;
+        if (actionsWeek) actionsWeek.textContent = stats.actions_this_week || 0;
         
         const actionsMonth = document.getElementById('audit-actions-month');
-        if (actionsMonth) actionsMonth.textContent = stats.actions_month || 0;
+        if (actionsMonth) actionsMonth.textContent = stats.actions_this_month || 0;
         
         const failedLogins = document.getElementById('audit-failed-logins');
         if (failedLogins) failedLogins.textContent = stats.failed_logins || 0;
@@ -1788,7 +1788,7 @@ function truncateString(str, length) {
 // Setup audit log event listeners (should be called from setupAdminEventListeners)
 function setupAuditLogEventListeners() {
     // Filter button
-    const filterBtn = document.getElementById('audit-filter-btn');
+    const filterBtn = document.getElementById('audit-apply-filters-btn');
     if (filterBtn) {
         filterBtn.addEventListener('click', async () => {
             await filterAuditLogs();
@@ -1839,52 +1839,68 @@ function setupAuditLogEventListeners() {
 
 // Initialize location picker for create hospital form
 function initializeCreateHospitalLocationPicker() {
-    const pickOnMapBtn = document.getElementById('pick-location-create-btn');
-    const mapContainer = document.getElementById('create-hospital-map-container');
+    const pickOnMapBtn = document.getElementById('pick-location-btn');
+    const mapContainer = document.getElementById('location-picker-map');
     const latInput = document.getElementById('hospital-latitude');
     const lonInput = document.getElementById('hospital-longitude');
     
     if (!pickOnMapBtn || !mapContainer) return;
     
+    let pickerInstance = null;
+    
     // Toggle map visibility
     pickOnMapBtn.addEventListener('click', () => {
         const isVisible = mapContainer.style.display === 'block';
         mapContainer.style.display = isVisible ? 'none' : 'block';
-        pickOnMapBtn.textContent = isVisible ? 'Pick on Map' : 'Hide Map';
+        pickOnMapBtn.textContent = isVisible ? '📍 Pick on Map' : 'Hide Map';
         
         // Initialize map if showing
-        if (!isVisible && window.initHospitalMapPicker) {
-            window.initHospitalMapPicker('create-hospital-map', (lat, lon) => {
-                if (latInput) latInput.value = lat.toFixed(6);
-                if (lonInput) lonInput.value = lon.toFixed(6);
-            });
+        if (!isVisible && typeof initializeLocationPicker === 'function') {
+            const defaultLat = parseFloat(latInput?.value) || 50.8503;
+            const defaultLon = parseFloat(lonInput?.value) || 4.3517;
+            pickerInstance = initializeLocationPicker(
+                'location-picker-map',
+                defaultLat,
+                defaultLon,
+                (lat, lon) => {
+                    if (latInput) latInput.value = lat.toFixed(6);
+                    if (lonInput) lonInput.value = lon.toFixed(6);
+                }
+            );
         }
     });
 }
 
 // Initialize location picker for edit hospital form
 function initializeEditHospitalLocationPicker() {
-    const pickOnMapBtn = document.getElementById('pick-location-edit-btn');
-    const mapContainer = document.getElementById('edit-hospital-map-container');
+    const pickOnMapBtn = document.getElementById('edit-pick-location-btn');
+    const mapContainer = document.getElementById('edit-location-picker-map');
     const latInput = document.getElementById('edit-hospital-latitude');
     const lonInput = document.getElementById('edit-hospital-longitude');
     
     if (!pickOnMapBtn || !mapContainer) return;
     
+    let pickerInstance = null;
+    
     // Toggle map visibility
     pickOnMapBtn.addEventListener('click', () => {
         const isVisible = mapContainer.style.display === 'block';
         mapContainer.style.display = isVisible ? 'none' : 'block';
-        pickOnMapBtn.textContent = isVisible ? 'Pick on Map' : 'Hide Map';
+        pickOnMapBtn.textContent = isVisible ? '📍 Pick on Map' : 'Hide Map';
         
         // Initialize map if showing
-        if (!isVisible && window.initHospitalMapPicker) {
-            const currentLat = parseFloat(latInput?.value) || 0;
-            const currentLon = parseFloat(lonInput?.value) || 0;
-            window.initHospitalMapPicker('edit-hospital-map', (lat, lon) => {
-                if (latInput) latInput.value = lat.toFixed(6);
-                if (lonInput) lonInput.value = lon.toFixed(6);
-            }, currentLat, currentLon);
+        if (!isVisible && typeof initializeLocationPicker === 'function') {
+            const currentLat = parseFloat(latInput?.value) || 50.8503;
+            const currentLon = parseFloat(lonInput?.value) || 4.3517;
+            pickerInstance = initializeLocationPicker(
+                'edit-location-picker-map',
+                currentLat,
+                currentLon,
+                (lat, lon) => {
+                    if (latInput) latInput.value = lat.toFixed(6);
+                    if (lonInput) lonInput.value = lon.toFixed(6);
+                }
+            );
         }
     });
 }

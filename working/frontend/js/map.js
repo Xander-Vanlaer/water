@@ -199,14 +199,16 @@ function initializeLocationPicker(containerId, initialLat = 50.8503, initialLng 
 
 /**
  * Update location picker marker position
- * @param {object} marker - Leaflet marker object
+ * @param {object} pickerInstance - Object returned from initializeLocationPicker containing {map, marker}
  * @param {number} lat - Latitude
  * @param {number} lng - Longitude
  */
-function updatePickerLocation(marker, lat, lng) {
-    if (marker && lat && lng) {
-        marker.setLatLng([lat, lng]);
-        marker.getMap().setView([lat, lng], 13);
+function updatePickerLocation(pickerInstance, lat, lng) {
+    if (pickerInstance && pickerInstance.marker && lat && lng) {
+        pickerInstance.marker.setLatLng([lat, lng]);
+        if (pickerInstance.map) {
+            pickerInstance.map.setView([lat, lng], 13);
+        }
     }
 }
 

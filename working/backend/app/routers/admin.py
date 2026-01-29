@@ -15,7 +15,7 @@ from app.schemas import (
     APIKeyCreate, APIKeyResponse, MessageResponse,
     SensorOverviewResponse, SensorStatsResponse, SensorDataResponse,
     AllowedEmailCreate, AllowedEmailResponse,
-    AuditLogResponse, AuditLogStatsResponse, HospitalMapResponse
+    AuditLogResponse, AuditLogStatsResponse, AuditLogsPaginatedResponse, HospitalMapResponse
 )
 from app.dependencies import require_admin
 from app.audit import (
@@ -700,7 +700,7 @@ async def delete_allowed_email(
 
 
 # Audit Log Endpoints
-@router.get("/audit-logs", response_model=List[AuditLogResponse])
+@router.get("/audit-logs", response_model=AuditLogsPaginatedResponse)
 async def list_audit_logs(
     user_id: Optional[int] = None,
     action: Optional[str] = None,
@@ -713,7 +713,7 @@ async def list_audit_logs(
     current_user: User = Depends(require_admin),
     db: Session = Depends(get_db)
 ):
-    """List audit logs with filtering (admin only)"""
+    """List audit logs with filtering and pagination metadata (admin only)"""
     query = db.query(AuditLog)
     
     # Apply filters
@@ -730,10 +730,16 @@ async def list_audit_logs(
     if status:
         query = query.filter(AuditLog.status == status)
     
+    # Get total count of matching audit logs (before pagination)
+    total_count = query.count()
+    
     # Order by most recent first and apply pagination
     audit_logs = query.order_by(AuditLog.timestamp.desc()).offset(offset).limit(min(limit, 1000)).all()
     
-    return audit_logs
+    return {
+        "logs": audit_logs,
+        "total": total_count
+    }
 
 
 @router.get("/audit-logs/stats", response_model=AuditLogStatsResponse)
