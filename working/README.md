@@ -17,6 +17,7 @@ A production-ready, secure web application featuring Docker containerization, Fa
 - ✅ **Password Complexity** - Enforced password requirements
 - ✅ **Environment-based Secrets** - No hardcoded credentials
 - ✅ **API Key Authentication** - Secure sensor data ingestion with API keys
+- ✅ **Audit Logging** - Comprehensive action tracking for security and compliance
 
 ### RBAC Features
 - 🔐 **Role-Based Access Control** - 4 user roles with different permissions
@@ -24,6 +25,8 @@ A production-ready, secure web application featuring Docker containerization, Fa
 - 🌍 **Region Management** - Regional organization with region admins
 - 📊 **IoT Sensor Integration** - Secure API for Orange Pi sensor data ingestion
 - 📈 **Dashboard Analytics** - Role-filtered statistics and visualizations
+- 🗺️ **Hospital Location Map** - Interactive map showing hospital locations with sensor status
+- 📋 **Audit Logs** - Track all user actions, failed logins, and system changes
 
 ### Technical Features
 - 🐳 **Docker Containerization** - Complete multi-container setup
@@ -34,6 +37,7 @@ A production-ready, secure web application featuring Docker containerization, Fa
 - 🔍 **Health Checks** - Service monitoring and orchestration
 - 📱 **Responsive Design** - Mobile-friendly frontend
 - ⚡ **Async/Await** - High-performance async operations
+- 🗺️ **Leaflet Maps** - Interactive maps with marker clustering
 
 ## 👥 User Roles
 
@@ -54,12 +58,15 @@ The application supports 4 user roles with hierarchical permissions:
 | Enable 2FA | ✅ | ✅ | ✅ | ✅ |
 | Create regions | ❌ | ✅ | ❌ | ❌ |
 | Create hospitals | ❌ | ✅ | ❌ | ❌ |
+| Set hospital locations | ❌ | ✅ | ❌ | ❌ |
 | Manage API keys | ❌ | ✅ | ❌ | ❌ |
 | Update user roles | ❌ | ✅ | ❌ | ❌ |
 | Assign users to regions | ❌ | ✅ | ❌ | ❌ |
 | Assign users to hospitals | ❌ | ✅ | ✅ (in region) | ❌ |
 | View all sensor data | ❌ | ✅ | ✅ (in region) | ✅ (own hospital) |
 | Ingest sensor data (API) | ❌ | ✅ (via API key) | ✅ (via API key) | ✅ (via API key) |
+| View audit logs | ❌ | ✅ | ❌ | ❌ |
+| View hospital map | ❌ | ✅ | ✅ (region only) | ❌ |
 
 ## 📋 Prerequisites
 
@@ -316,6 +323,165 @@ To create additional users:
 |--------|----------|-------------|
 | GET | `/health` | Health check |
 | GET | `/` | API information |
+
+### Audit Log Endpoints (Admin only)
+
+| Method | Endpoint | Description | Auth Required |
+|--------|----------|-------------|---------------|
+| GET | `/api/admin/audit-logs` | List audit logs with filtering | Yes (Admin) |
+| GET | `/api/admin/audit-logs/stats` | Get audit log statistics | Yes (Admin) |
+
+**Audit Log Query Parameters:**
+- `user_id`: Filter by user ID
+- `action`: Filter by action type (e.g., "user_login", "role_update")
+- `resource_type`: Filter by resource type (e.g., "user", "region", "hospital")
+- `start_date`: Start date for filtering (ISO 8601 format)
+- `end_date`: End date for filtering (ISO 8601 format)
+- `status`: Filter by status ("success" or "failure")
+- `limit`: Number of results per page (max 1000, default 100)
+- `offset`: Pagination offset (default 0)
+
+### Hospital Map Endpoints
+
+| Method | Endpoint | Description | Auth Required |
+|--------|----------|-------------|---------------|
+| GET | `/api/admin/hospitals/map` | Get all hospitals with location data | Yes (Admin) |
+| GET | `/api/region/hospitals/map` | Get region hospitals with location data | Yes (Region Admin) |
+
+**Hospital Map Response:**
+```json
+{
+  "id": 1,
+  "name": "General Hospital",
+  "code": "GH001",
+  "latitude": 50.8503,
+  "longitude": 4.3517,
+  "sensor_count": 5,
+  "last_reading_time": "2026-01-29T10:30:00",
+  "region_id": 1,
+  "region_name": "Brussels"
+}
+```
+
+## 📋 Audit Logging System
+
+The application includes comprehensive audit logging to track all user actions for security, compliance, and debugging purposes.
+
+### What Gets Logged
+
+**Authentication Events:**
+- User registration
+- Successful and failed login attempts
+- Logout events
+- 2FA enable/disable actions
+
+**Administrative Actions:**
+- User role changes
+- User assignments to regions/hospitals
+- Region create/update/delete operations
+- Hospital create/update/delete operations
+- API key create/validate/revoke operations
+- Email whitelist modifications
+
+**Sensor Data:**
+- Sensor data ingestion (sampled at 1% to avoid log spam)
+
+### Viewing Audit Logs
+
+**Admin Dashboard:**
+1. Navigate to Admin section
+2. Click on "Audit Logs" tab
+3. Use filters to search:
+   - Date range
+   - User
+   - Action type
+   - Resource type
+   - Status (success/failure)
+4. View statistics:
+   - Total actions today/week/month
+   - Top active users
+   - Recent critical actions
+   - Failed login attempts
+
+**API Access:**
+```bash
+# Get recent audit logs
+curl -H "Authorization: Bearer YOUR_TOKEN" \
+  "http://localhost/api/admin/audit-logs?limit=50"
+
+# Get failed login attempts
+curl -H "Authorization: Bearer YOUR_TOKEN" \
+  "http://localhost/api/admin/audit-logs?action=user_login&status=failure"
+
+# Get audit statistics
+curl -H "Authorization: Bearer YOUR_TOKEN" \
+  "http://localhost/api/admin/audit-logs/stats"
+```
+
+### Log Retention
+
+**Recommendation:** Implement a log retention policy to archive or delete audit logs older than 90 days to maintain database performance. See comments in `app/models.py` for the AuditLog model.
+
+## 🗺️ Hospital Location Map
+
+The application includes an interactive map to visualize hospital locations and sensor deployment.
+
+### Features
+
+**Interactive Map:**
+- View all hospitals on an interactive Leaflet map
+- Color-coded markers based on sensor activity:
+  - 🟢 Green: Active sensors (data within last hour)
+  - 🔵 Blue: Has sensors (inactive)
+  - ⚫ Gray: No sensors
+- Marker clustering for better performance with many hospitals
+- Click markers to view hospital details
+- Auto-zoom to fit all hospital markers
+
+**Hospital Details:**
+- Hospital name and code
+- Region
+- Number of sensors
+- Last sensor reading timestamp
+- Link to detailed hospital view
+
+**Filters:**
+- Filter by region
+- Show only hospitals with active sensors
+- Search functionality in sidebar
+
+### Adding Hospital Locations
+
+**Admin Dashboard:**
+1. Navigate to Admin section
+2. Go to "Hospitals" tab
+3. Create new hospital or edit existing:
+   - Enter latitude (-90 to 90)
+   - Enter longitude (-180 to 180)
+   - Or click "Pick on Map" button to select location interactively
+4. Save hospital
+
+**Valid Coordinate Ranges:**
+- Latitude: -90° to 90° (North/South)
+- Longitude: -180° to 180° (East/West)
+
+### Accessing the Map
+
+**Web Interface:**
+- Click "Hospital Map" link in Admin or Region Admin dashboard
+- Opens full-screen interactive map
+- Sidebar shows hospital list and filters
+
+**API Access:**
+```bash
+# Get all hospitals with map data
+curl -H "Authorization: Bearer YOUR_TOKEN" \
+  "http://localhost/api/admin/hospitals/map"
+
+# Get hospitals for specific region
+curl -H "Authorization: Bearer YOUR_TOKEN" \
+  "http://localhost/api/admin/hospitals/map?region_id=1"
+```
 
 ## 🌡️ IoT Sensor Integration (Orange Pi)
 

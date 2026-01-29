@@ -57,6 +57,9 @@ class Hospital(Base):
     code = Column(String(50), unique=True, nullable=False)
     region_id = Column(Integer, ForeignKey("regions.id"), nullable=False)
     address = Column(String(500), nullable=True)
+    latitude = Column(Float, nullable=True)
+    longitude = Column(Float, nullable=True)
+    map_zoom = Column(Integer, default=13, nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow)
     
     # Relationships
@@ -120,3 +123,23 @@ class DataItem(Base):
     
     # Relationship
     user = relationship("User", back_populates="data_items")
+
+
+class AuditLog(Base):
+    """Audit log model for tracking all system actions"""
+    __tablename__ = "audit_logs"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=True)  # Nullable for system actions
+    username = Column(String(50), nullable=True, index=True)  # Denormalized for faster queries
+    action = Column(String(100), nullable=False, index=True)  # e.g., "user_login", "user_register"
+    resource_type = Column(String(50), nullable=True, index=True)  # e.g., "user", "region", "hospital"
+    resource_id = Column(String(100), nullable=True)  # ID of affected resource
+    details = Column(JSON, nullable=True)  # Additional context about the action
+    ip_address = Column(String(50), nullable=True)  # User's IP address
+    user_agent = Column(String(500), nullable=True)  # Browser/client info
+    timestamp = Column(DateTime, default=datetime.utcnow, nullable=False, index=True)
+    status = Column(String(20), default="success", nullable=False)  # success/failure
+    
+    # Note: Consider implementing log retention policy to archive/delete old logs
+    # Recommendation: Keep logs for 90 days in active table, archive older logs

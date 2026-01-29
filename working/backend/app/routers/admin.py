@@ -1,22 +1,27 @@
 """
 Admin router for managing users, regions, hospitals, and API keys
 """
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Request
 from sqlalchemy.orm import Session
-from sqlalchemy import func
+from sqlalchemy import func, and_, or_
 from typing import List, Optional
 from datetime import datetime, timedelta
 from app.database import get_db
-from app.models import User, Region, Hospital, APIKey, SensorData, AllowedEmail
+from app.models import User, Region, Hospital, APIKey, SensorData, AllowedEmail, AuditLog
 from app.schemas import (
     UserResponse, UserRoleUpdate, UserAssignment,
     RegionCreate, RegionResponse, RegionUpdate,
     HospitalCreate, HospitalResponse, HospitalUpdate,
     APIKeyCreate, APIKeyResponse, MessageResponse,
     SensorOverviewResponse, SensorStatsResponse, SensorDataResponse,
-    AllowedEmailCreate, AllowedEmailResponse
+    AllowedEmailCreate, AllowedEmailResponse,
+    AuditLogResponse, AuditLogStatsResponse, AuditLogsPaginatedResponse, HospitalMapResponse
 )
 from app.dependencies import require_admin
+from app.audit import (
+    log_role_change, log_user_assignment, log_api_key_action, 
+    log_resource_action
+)
 import secrets
 
 router = APIRouter(prefix="/api/admin", tags=["Admin"])
@@ -26,6 +31,7 @@ router = APIRouter(prefix="/api/admin", tags=["Admin"])
 async def update_user_role(
     user_id: int,
     role_update: UserRoleUpdate,
+    request: Request,
     current_user: User = Depends(require_admin),
     db: Session = Depends(get_db)
 ):
@@ -45,9 +51,13 @@ async def update_user_role(
             detail="Cannot change your own role"
         )
     
+    old_role = user.role
     user.role = role_update.role
     db.commit()
     db.refresh(user)
+    
+    # Log the role change
+    log_role_change(db, user, old_role, role_update.role, current_user, request)
     
     return user
 
@@ -56,6 +66,7 @@ async def update_user_role(
 async def assign_user(
     user_id: int,
     assignment: UserAssignment,
+    request: Request,
     current_user: User = Depends(require_admin),
     db: Session = Depends(get_db)
 ):
@@ -97,6 +108,9 @@ async def assign_user(
     db.commit()
     db.refresh(user)
     
+    # Log the assignment
+    log_user_assignment(db, user, assignment.region_id, assignment.hospital_id, current_user, request)
+    
     return user
 
 
@@ -135,6 +149,7 @@ async def list_regions(
 @router.post("/regions", response_model=RegionResponse, status_code=status.HTTP_201_CREATED)
 async def create_region(
     region_data: RegionCreate,
+    request: Request,
     current_user: User = Depends(require_admin),
     db: Session = Depends(get_db)
 ):
@@ -158,6 +173,9 @@ async def create_region(
     db.commit()
     db.refresh(region)
     
+    # Log region creation
+    log_resource_action(db, "create", "region", region.id, region.name, current_user, request)
+    
     return region
 
 
@@ -180,6 +198,7 @@ async def list_hospitals(
 @router.post("/hospitals", response_model=HospitalResponse, status_code=status.HTTP_201_CREATED)
 async def create_hospital(
     hospital_data: HospitalCreate,
+    request: Request,
     current_user: User = Depends(require_admin),
     db: Session = Depends(get_db)
 ):
@@ -207,11 +226,17 @@ async def create_hospital(
         name=hospital_data.name,
         code=hospital_data.code,
         region_id=hospital_data.region_id,
-        address=hospital_data.address
+        address=hospital_data.address,
+        latitude=hospital_data.latitude,
+        longitude=hospital_data.longitude
     )
     db.add(hospital)
     db.commit()
     db.refresh(hospital)
+    
+    # Log hospital creation
+    log_resource_action(db, "create", "hospital", hospital.id, hospital.name, current_user, request,
+                       {"region_id": hospital_data.region_id})
     
     return hospital
 
@@ -219,6 +244,7 @@ async def create_hospital(
 @router.post("/api-keys", response_model=APIKeyResponse, status_code=status.HTTP_201_CREATED)
 async def create_api_key(
     api_key_data: APIKeyCreate,
+    request: Request,
     current_user: User = Depends(require_admin),
     db: Session = Depends(get_db)
 ):
@@ -253,12 +279,16 @@ async def create_api_key(
     db.commit()
     db.refresh(api_key)
     
+    # Log API key creation
+    log_api_key_action(db, "create", api_key.id, api_key.sensor_id, api_key.hospital_id, current_user, request)
+    
     return api_key
 
 
 @router.delete("/api-keys/{key_id}", response_model=MessageResponse)
 async def revoke_api_key(
     key_id: int,
+    request: Request,
     current_user: User = Depends(require_admin),
     db: Session = Depends(get_db)
 ):
@@ -273,6 +303,9 @@ async def revoke_api_key(
     
     api_key.is_active = False
     db.commit()
+    
+    # Log API key revocation
+    log_api_key_action(db, "revoke", api_key.id, api_key.sensor_id, api_key.hospital_id, current_user, request)
     
     return MessageResponse(message="API key revoked successfully")
 
@@ -297,6 +330,7 @@ async def list_api_keys(
 async def update_region(
     region_id: int,
     region_data: RegionUpdate,
+    request: Request,
     current_user: User = Depends(require_admin),
     db: Session = Depends(get_db)
 ):
@@ -331,12 +365,16 @@ async def update_region(
     db.commit()
     db.refresh(region)
     
+    # Log region update
+    log_resource_action(db, "update", "region", region.id, region.name, current_user, request)
+    
     return region
 
 
 @router.delete("/regions/{region_id}", response_model=MessageResponse)
 async def delete_region(
     region_id: int,
+    request: Request,
     current_user: User = Depends(require_admin),
     db: Session = Depends(get_db)
 ):
@@ -368,6 +406,9 @@ async def delete_region(
     db.delete(region)
     db.commit()
     
+    # Log region deletion
+    log_resource_action(db, "delete", "region", region.id, region.name, current_user, request)
+    
     return MessageResponse(message="Region deleted successfully")
 
 
@@ -375,6 +416,7 @@ async def delete_region(
 async def update_hospital(
     hospital_id: int,
     hospital_data: HospitalUpdate,
+    request: Request,
     current_user: User = Depends(require_admin),
     db: Session = Depends(get_db)
 ):
@@ -419,8 +461,17 @@ async def update_hospital(
     if hospital_data.address is not None:
         hospital.address = hospital_data.address
     
+    if hospital_data.latitude is not None:
+        hospital.latitude = hospital_data.latitude
+    
+    if hospital_data.longitude is not None:
+        hospital.longitude = hospital_data.longitude
+    
     db.commit()
     db.refresh(hospital)
+    
+    # Log hospital update
+    log_resource_action(db, "update", "hospital", hospital.id, hospital.name, current_user, request)
     
     return hospital
 
@@ -560,6 +611,7 @@ async def get_sensor_stats(
 @router.put("/api-keys/{key_id}/validate", response_model=APIKeyResponse)
 async def validate_api_key(
     key_id: int,
+    request: Request,
     current_user: User = Depends(require_admin),
     db: Session = Depends(get_db)
 ):
@@ -576,12 +628,16 @@ async def validate_api_key(
     db.commit()
     db.refresh(api_key)
     
+    # Log API key validation
+    log_api_key_action(db, "validate", api_key.id, api_key.sensor_id, api_key.hospital_id, current_user, request)
+    
     return api_key
 
 
 @router.post("/allowed-emails", response_model=AllowedEmailResponse, status_code=status.HTTP_201_CREATED)
 async def add_allowed_email(
     email_data: AllowedEmailCreate,
+    request: Request,
     current_user: User = Depends(require_admin),
     db: Session = Depends(get_db)
 ):
@@ -602,6 +658,9 @@ async def add_allowed_email(
     db.commit()
     db.refresh(allowed_email)
     
+    # Log allowed email creation
+    log_resource_action(db, "create", "allowed_email", allowed_email.id, allowed_email.email, current_user, request)
+    
     return allowed_email
 
 
@@ -618,6 +677,7 @@ async def list_allowed_emails(
 @router.delete("/allowed-emails/{email_id}", response_model=MessageResponse)
 async def delete_allowed_email(
     email_id: int,
+    request: Request,
     current_user: User = Depends(require_admin),
     db: Session = Depends(get_db)
 ):
@@ -633,4 +693,186 @@ async def delete_allowed_email(
     db.delete(allowed_email)
     db.commit()
     
+    # Log allowed email deletion
+    log_resource_action(db, "delete", "allowed_email", allowed_email.id, allowed_email.email, current_user, request)
+    
     return MessageResponse(message="Email removed from whitelist successfully")
+
+
+# Audit Log Endpoints
+@router.get("/audit-logs", response_model=AuditLogsPaginatedResponse)
+async def list_audit_logs(
+    user_id: Optional[int] = None,
+    action: Optional[str] = None,
+    resource_type: Optional[str] = None,
+    start_date: Optional[datetime] = None,
+    end_date: Optional[datetime] = None,
+    status: Optional[str] = None,
+    limit: int = 100,
+    offset: int = 0,
+    current_user: User = Depends(require_admin),
+    db: Session = Depends(get_db)
+):
+    """List audit logs with filtering and pagination metadata (admin only)"""
+    query = db.query(AuditLog)
+    
+    # Apply filters
+    if user_id is not None:
+        query = query.filter(AuditLog.user_id == user_id)
+    if action:
+        query = query.filter(AuditLog.action == action)
+    if resource_type:
+        query = query.filter(AuditLog.resource_type == resource_type)
+    if start_date:
+        query = query.filter(AuditLog.timestamp >= start_date)
+    if end_date:
+        query = query.filter(AuditLog.timestamp <= end_date)
+    if status:
+        query = query.filter(AuditLog.status == status)
+    
+    # Get total count of matching audit logs (before pagination)
+    total_count = query.count()
+    
+    # Order by most recent first and apply pagination
+    audit_logs = query.order_by(AuditLog.timestamp.desc()).offset(offset).limit(min(limit, 1000)).all()
+    
+    return {
+        "logs": audit_logs,
+        "total": total_count
+    }
+
+
+@router.get("/audit-logs/stats", response_model=AuditLogStatsResponse)
+async def get_audit_log_stats(
+    current_user: User = Depends(require_admin),
+    db: Session = Depends(get_db)
+):
+    """Get audit log statistics (admin only)"""
+    now = datetime.utcnow()
+    today_start = datetime(now.year, now.month, now.day)
+    week_start = now - timedelta(days=7)
+    month_start = now - timedelta(days=30)
+    
+    # Total actions count
+    total_actions = db.query(func.count(AuditLog.id)).scalar() or 0
+    
+    # Actions today
+    actions_today = db.query(func.count(AuditLog.id)).filter(
+        AuditLog.timestamp >= today_start
+    ).scalar() or 0
+    
+    # Actions this week
+    actions_this_week = db.query(func.count(AuditLog.id)).filter(
+        AuditLog.timestamp >= week_start
+    ).scalar() or 0
+    
+    # Actions this month
+    actions_this_month = db.query(func.count(AuditLog.id)).filter(
+        AuditLog.timestamp >= month_start
+    ).scalar() or 0
+    
+    # Top 10 most active users
+    top_users_query = db.query(
+        AuditLog.username,
+        func.count(AuditLog.id).label('action_count')
+    ).filter(
+        AuditLog.username.isnot(None)
+    ).group_by(
+        AuditLog.username
+    ).order_by(
+        func.count(AuditLog.id).desc()
+    ).limit(10).all()
+    
+    top_users = [
+        {"username": username, "action_count": count}
+        for username, count in top_users_query
+    ]
+    
+    # Recent critical actions (last 50 actions excluding routine sensor data)
+    recent_critical = db.query(AuditLog).filter(
+        AuditLog.action != "sensor_data_ingest"
+    ).order_by(
+        AuditLog.timestamp.desc()
+    ).limit(50).all()
+    
+    recent_critical_actions = [
+        {
+            "id": log.id,
+            "timestamp": log.timestamp.isoformat(),
+            "username": log.username,
+            "action": log.action,
+            "resource_type": log.resource_type,
+            "status": log.status
+        }
+        for log in recent_critical
+    ]
+    
+    # Failed login attempts (last 30 days)
+    failed_logins_count = db.query(func.count(AuditLog.id)).filter(
+        and_(
+            AuditLog.action == "user_login",
+            AuditLog.status == "failure",
+            AuditLog.timestamp >= month_start
+        )
+    ).scalar() or 0
+    
+    return AuditLogStatsResponse(
+        total_actions=total_actions,
+        actions_today=actions_today,
+        actions_this_week=actions_this_week,
+        actions_this_month=actions_this_month,
+        top_users=top_users,
+        recent_critical_actions=recent_critical_actions,
+        failed_logins_count=failed_logins_count
+    )
+
+
+# Hospital Map Endpoints
+@router.get("/hospitals/map", response_model=List[HospitalMapResponse])
+async def get_hospitals_map_data(
+    region_id: Optional[int] = None,
+    current_user: User = Depends(require_admin),
+    db: Session = Depends(get_db)
+):
+    """Get hospital map data with sensor counts (admin only)"""
+    # Subquery to get sensor count and latest reading per hospital
+    sensor_stats = db.query(
+        SensorData.hospital_id,
+        func.count(func.distinct(SensorData.sensor_id)).label('sensor_count'),
+        func.max(SensorData.timestamp).label('last_reading_time')
+    ).group_by(SensorData.hospital_id).subquery()
+    
+    # Main query for hospitals with region info
+    query = db.query(
+        Hospital,
+        Region.name.label('region_name'),
+        func.coalesce(sensor_stats.c.sensor_count, 0).label('sensor_count'),
+        sensor_stats.c.last_reading_time
+    ).join(
+        Region, Hospital.region_id == Region.id
+    ).outerjoin(
+        sensor_stats, Hospital.id == sensor_stats.c.hospital_id
+    )
+    
+    # Apply region filter if provided
+    if region_id:
+        query = query.filter(Hospital.region_id == region_id)
+    
+    results = query.all()
+    
+    # Build response
+    map_data = []
+    for hospital, region_name, sensor_count, last_reading_time in results:
+        map_data.append(HospitalMapResponse(
+            id=hospital.id,
+            name=hospital.name,
+            code=hospital.code,
+            latitude=hospital.latitude,
+            longitude=hospital.longitude,
+            sensor_count=sensor_count,
+            last_reading_time=last_reading_time,
+            region_id=hospital.region_id,
+            region_name=region_name
+        ))
+    
+    return map_data

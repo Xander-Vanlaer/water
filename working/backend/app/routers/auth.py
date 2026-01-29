@@ -17,6 +17,7 @@ from app.auth import (
     verify_totp, generate_qr_code
 )
 from app.dependencies import get_current_active_user
+from app.audit import log_register, log_login, log_logout, log_2fa_action
 from slowapi import Limiter
 from slowapi.util import get_remote_address
 
@@ -85,6 +86,9 @@ async def register(
     db.commit()
     db.refresh(db_user)
     
+    # Log user registration
+    log_register(db, db_user, request)
+    
     return db_user
 
 
@@ -100,8 +104,9 @@ async def login(
     user = db.query(User).filter(User.username == login_data.username).first()
     
     if not user or not verify_password(login_data.password, user.hashed_password):
-        # Increment failed login attempts
+        # Log failed login attempt
         if user:
+            log_login(db, user, request, status="failure", failure_reason="Invalid password")
             user.failed_login_attempts += 1
             if user.failed_login_attempts >= 5:
                 user.locked_until = datetime.utcnow() + timedelta(minutes=15)
@@ -114,6 +119,7 @@ async def login(
     
     # Check if account is locked
     if user.locked_until and user.locked_until > datetime.utcnow():
+        log_login(db, user, request, status="failure", failure_reason="Account locked")
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail=f"Account locked until {user.locked_until.isoformat()}"
@@ -128,6 +134,9 @@ async def login(
     user.locked_until = None
     user.last_login = datetime.utcnow()
     db.commit()
+    
+    # Log successful login
+    log_login(db, user, request, status="success")
     
     # Create tokens
     access_token = create_access_token(data={"sub": user.username})
@@ -157,6 +166,7 @@ async def verify_2fa(
     
     # Verify TOTP code
     if not verify_totp(user.totp_secret, verify_data.totp_code):
+        log_login(db, user, request, status="failure", failure_reason="Invalid 2FA code")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid 2FA code"
@@ -167,6 +177,9 @@ async def verify_2fa(
     user.locked_until = None
     user.last_login = datetime.utcnow()
     db.commit()
+    
+    # Log successful 2FA login
+    log_login(db, user, request, status="success")
     
     # Create tokens
     access_token = create_access_token(data={"sub": user.username})
@@ -180,6 +193,7 @@ async def verify_2fa(
 
 @router.post("/enable-2fa", response_model=Enable2FAResponse)
 async def enable_2fa(
+    request: Request,
     current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db)
 ):
@@ -201,6 +215,9 @@ async def enable_2fa(
     current_user.is_2fa_enabled = True
     db.commit()
     
+    # Log 2FA enablement
+    log_2fa_action(db, "enable", current_user, request)
+    
     return Enable2FAResponse(
         qr_code=qr_code,
         secret=secret
@@ -209,6 +226,7 @@ async def enable_2fa(
 
 @router.post("/disable-2fa", response_model=MessageResponse)
 async def disable_2fa(
+    request: Request,
     current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db)
 ):
@@ -222,6 +240,9 @@ async def disable_2fa(
     current_user.is_2fa_enabled = False
     current_user.totp_secret = None
     db.commit()
+    
+    # Log 2FA disablement
+    log_2fa_action(db, "disable", current_user, request)
     
     return MessageResponse(message="2FA disabled successfully")
 
@@ -266,7 +287,14 @@ async def refresh_token(
 
 
 @router.post("/logout", response_model=MessageResponse)
-async def logout(current_user: User = Depends(get_current_active_user)):
+async def logout(
+    request: Request,
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
     """Logout current user"""
+    # Log user logout
+    log_logout(db, current_user, request)
+    
     # In a production app, you might want to blacklist the token
     return MessageResponse(message="Logged out successfully")

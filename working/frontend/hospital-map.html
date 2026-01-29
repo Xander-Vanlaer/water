@@ -1,0 +1,374 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hospital Map - Clean Water in Hospital</title>
+    <link rel="stylesheet" href="css/style.css">
+    
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" 
+          integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" 
+          crossorigin=""/>
+    
+    <!-- Marker Cluster CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css" />
+    
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        }
+        
+        .map-container {
+            display: flex;
+            height: 100vh;
+        }
+        
+        .map-sidebar {
+            width: 350px;
+            background: white;
+            border-right: 1px solid #ddd;
+            overflow-y: auto;
+            padding: 1rem;
+        }
+        
+        .map-main {
+            flex: 1;
+            position: relative;
+        }
+        
+        #hospitalMap {
+            width: 100%;
+            height: 100%;
+        }
+        
+        .sidebar-header {
+            margin-bottom: 1rem;
+            padding-bottom: 1rem;
+            border-bottom: 2px solid #4CAF50;
+        }
+        
+        .sidebar-header h1 {
+            margin: 0 0 0.5rem 0;
+            font-size: 1.5rem;
+            color: #333;
+        }
+        
+        .filter-group {
+            margin-bottom: 1rem;
+        }
+        
+        .filter-group label {
+            display: block;
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+            color: #555;
+        }
+        
+        .filter-group select,
+        .filter-group input {
+            width: 100%;
+            padding: 0.5rem;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 0.9rem;
+        }
+        
+        .legend {
+            background: white;
+            padding: 1rem;
+            border-radius: 8px;
+            margin-top: 1rem;
+        }
+        
+        .legend h3 {
+            margin: 0 0 0.5rem 0;
+            font-size: 1rem;
+        }
+        
+        .legend-item {
+            display: flex;
+            align-items: center;
+            margin: 0.5rem 0;
+        }
+        
+        .legend-color {
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            margin-right: 0.5rem;
+            border: 2px solid white;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+        }
+        
+        .hospital-list {
+            margin-top: 1rem;
+        }
+        
+        .hospital-list-item {
+            padding: 0.75rem;
+            border: 1px solid #eee;
+            border-radius: 4px;
+            margin-bottom: 0.5rem;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+        
+        .hospital-list-item:hover {
+            background-color: #f5f5f5;
+        }
+        
+        .hospital-list-item h4 {
+            margin: 0 0 0.25rem 0;
+            font-size: 0.9rem;
+        }
+        
+        .hospital-list-item p {
+            margin: 0.25rem 0;
+            font-size: 0.8rem;
+            color: #666;
+        }
+        
+        .btn {
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            padding: 0.75rem 1.5rem;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 1rem;
+            width: 100%;
+            margin-top: 0.5rem;
+        }
+        
+        .btn:hover {
+            background-color: #45a049;
+        }
+        
+        .btn-secondary {
+            background-color: #6c757d;
+        }
+        
+        .btn-secondary:hover {
+            background-color: #5a6268;
+        }
+        
+        .hospital-popup h3 {
+            margin: 0 0 0.5rem 0;
+            font-size: 1.1rem;
+            color: #333;
+        }
+        
+        .hospital-popup p {
+            margin: 0.25rem 0;
+            font-size: 0.9rem;
+        }
+        
+        .hospital-popup .btn-small {
+            display: inline-block;
+            margin-top: 0.5rem;
+            padding: 0.4rem 0.8rem;
+            background-color: #4CAF50;
+            color: white;
+            text-decoration: none;
+            border-radius: 4px;
+            font-size: 0.85rem;
+        }
+        
+        .hospital-popup .btn-small:hover {
+            background-color: #45a049;
+        }
+        
+        @media (max-width: 768px) {
+            .map-container {
+                flex-direction: column;
+            }
+            
+            .map-sidebar {
+                width: 100%;
+                height: 40vh;
+                border-right: none;
+                border-bottom: 1px solid #ddd;
+            }
+            
+            .map-main {
+                height: 60vh;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="map-container">
+        <div class="map-sidebar">
+            <div class="sidebar-header">
+                <h1>Hospital Map</h1>
+                <a href="index.html" class="btn-secondary" style="display: inline-block; text-decoration: none; text-align: center; padding: 0.5rem 1rem; border-radius: 4px;">
+                    ← Back to Dashboard
+                </a>
+            </div>
+            
+            <div class="filter-group">
+                <label for="regionFilter">Filter by Region:</label>
+                <select id="regionFilter">
+                    <option value="">All Regions</option>
+                </select>
+            </div>
+            
+            <div class="filter-group">
+                <label>
+                    <input type="checkbox" id="activeSensorsOnly"> 
+                    Show only hospitals with active sensors
+                </label>
+            </div>
+            
+            <button class="btn" onclick="applyMapFilters()">Apply Filters</button>
+            
+            <div class="legend">
+                <h3>Legend</h3>
+                <div class="legend-item">
+                    <div class="legend-color" style="background-color: green;"></div>
+                    <span>Active sensors (data < 1 hour)</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background-color: blue;"></div>
+                    <span>Has sensors (inactive)</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background-color: gray;"></div>
+                    <span>No sensors</span>
+                </div>
+            </div>
+            
+            <div class="hospital-list" id="hospitalList">
+                <h3>Hospitals</h3>
+                <div id="hospitalListContent">
+                    <!-- Hospital list items will be added here -->
+                </div>
+            </div>
+        </div>
+        
+        <div class="map-main">
+            <div id="hospitalMap"></div>
+        </div>
+    </div>
+    
+    <!-- Leaflet JS -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+            integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+            crossorigin=""></script>
+    
+    <!-- Marker Cluster JS -->
+    <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
+    
+    <!-- Our custom JS -->
+    <script src="js/map.js"></script>
+    
+    <script>
+        let currentHospitals = [];
+        
+        // Initialize map on page load
+        document.addEventListener('DOMContentLoaded', async function() {
+            // Check authentication
+            const token = localStorage.getItem('token');
+            if (!token) {
+                window.location.href = 'login.html';
+                return;
+            }
+            
+            // Initialize map
+            initializeMap('hospitalMap');
+            
+            // Load regions for filter
+            await loadRegions();
+            
+            // Load hospitals
+            await loadHospitals();
+        });
+        
+        async function loadRegions() {
+            try {
+                const response = await fetch('/api/admin/regions', {
+                    headers: {
+                        'Authorization': `Bearer ${localStorage.getItem('token')}`
+                    }
+                });
+                
+                if (response.ok) {
+                    const regions = await response.json();
+                    const regionFilter = document.getElementById('regionFilter');
+                    
+                    regions.forEach(region => {
+                        const option = document.createElement('option');
+                        option.value = region.id;
+                        option.textContent = region.name;
+                        regionFilter.appendChild(option);
+                    });
+                }
+            } catch (error) {
+                console.error('Error loading regions:', error);
+            }
+        }
+        
+        async function loadHospitals() {
+            try {
+                const hospitals = await loadHospitalMarkers('/api/admin/hospitals/map');
+                currentHospitals = hospitals || [];
+                updateHospitalList(currentHospitals);
+            } catch (error) {
+                console.error('Error loading hospitals:', error);
+            }
+        }
+        
+        function updateHospitalList(hospitals) {
+            const listContent = document.getElementById('hospitalListContent');
+            listContent.innerHTML = '';
+            
+            if (!hospitals || hospitals.length === 0) {
+                listContent.innerHTML = '<p>No hospitals found</p>';
+                return;
+            }
+            
+            hospitals.forEach(hospital => {
+                const item = document.createElement('div');
+                item.className = 'hospital-list-item';
+                item.onclick = () => {
+                    if (hospital.latitude && hospital.longitude) {
+                        hospitalMap.setView([hospital.latitude, hospital.longitude], 15);
+                    }
+                };
+                
+                item.innerHTML = `
+                    <h4>${escapeHtml(hospital.name)}</h4>
+                    <p><strong>Code:</strong> ${escapeHtml(hospital.code)}</p>
+                    <p><strong>Region:</strong> ${escapeHtml(hospital.region_name)}</p>
+                    <p><strong>Sensors:</strong> ${hospital.sensor_count}</p>
+                    ${hospital.latitude && hospital.longitude ? '' : '<p style="color: #f44336;">No location set</p>'}
+                `;
+                
+                listContent.appendChild(item);
+            });
+        }
+        
+        function applyMapFilters() {
+            const regionId = document.getElementById('regionFilter').value;
+            const activeSensorsOnly = document.getElementById('activeSensorsOnly').checked;
+            
+            filterHospitalsOnMap(regionId || null, activeSensorsOnly);
+        }
+        
+        function showNotification(message, type) {
+            // Simple notification - you could enhance this
+            alert(message);
+        }
+        
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+    </script>
+</body>
+</html>
