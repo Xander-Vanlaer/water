@@ -126,6 +126,8 @@ async function showAdminDashboard() {
         await loadHospitals();
         await loadAPIKeys();
         await loadAllowedEmails();
+        await loadAuditStats();
+        await loadAuditLogs();
         setupAdminEventListeners();
     }
 }
@@ -1327,6 +1329,13 @@ function setupAdminEventListeners() {
             showError('Failed to add email/domain to whitelist: ' + error.message);
         }
     });
+    
+    // Setup audit log event listeners
+    setupAuditLogEventListeners();
+    
+    // Initialize hospital location pickers if available
+    initializeCreateHospitalLocationPicker();
+    initializeEditHospitalLocationPicker();
 }
 
 // Helper to clear hospital form
@@ -1525,5 +1534,358 @@ function escapeHtml(text) {
     const div = document.createElement('div');
     div.textContent = text;
     return div.innerHTML;
+}
+
+// ================== Audit Log Functions ==================
+
+// Load and display audit logs with current filters
+async function loadAuditLogs() {
+    try {
+        // Get filter values from form inputs
+        const startDate = document.getElementById('audit-start-date')?.value || '';
+        const endDate = document.getElementById('audit-end-date')?.value || '';
+        const userId = document.getElementById('audit-user-id')?.value || '';
+        const action = document.getElementById('audit-action')?.value || '';
+        const resourceType = document.getElementById('audit-resource-type')?.value || '';
+        const status = document.getElementById('audit-status')?.value || '';
+        const limit = parseInt(document.getElementById('audit-limit')?.value) || 50;
+        const offset = parseInt(document.getElementById('audit-offset')?.value) || 0;
+        
+        // Build query parameters
+        const params = new URLSearchParams();
+        if (startDate) params.append('start_date', startDate);
+        if (endDate) params.append('end_date', endDate);
+        if (userId) params.append('user_id', userId);
+        if (action) params.append('action', action);
+        if (resourceType) params.append('resource_type', resourceType);
+        if (status) params.append('status', status);
+        params.append('limit', limit.toString());
+        params.append('offset', offset.toString());
+        
+        // Make API call
+        const response = await apiClient.request(`/api/admin/audit-logs?${params.toString()}`);
+        
+        const auditLogsTable = document.getElementById('audit-logs-table');
+        if (!auditLogsTable) return;
+        
+        const logs = response.logs || [];
+        const total = response.total || 0;
+        
+        if (logs.length === 0) {
+            auditLogsTable.innerHTML = '<p style="text-align: center; padding: 2rem; color: #888;">No audit logs found.</p>';
+        } else {
+            // Populate the audit logs table
+            auditLogsTable.innerHTML = `
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Timestamp</th>
+                            <th>User</th>
+                            <th>Action</th>
+                            <th>Resource</th>
+                            <th>Status</th>
+                            <th>IP Address</th>
+                            <th>Details</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${logs.map(log => `
+                            <tr>
+                                <td>${new Date(log.timestamp).toLocaleString()}</td>
+                                <td>${escapeHtml(log.username || 'N/A')}</td>
+                                <td><strong>${formatActionName(log.action)}</strong></td>
+                                <td>${escapeHtml(log.resource_type || 'N/A')}</td>
+                                <td><span class="status-badge status-${log.status}">${log.status}</span></td>
+                                <td>${escapeHtml(log.ip_address || 'N/A')}</td>
+                                <td>${formatAuditDetails(log.details)}</td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
+            `;
+        }
+        
+        // Update pagination info
+        const currentPage = Math.floor(offset / limit) + 1;
+        const totalPages = Math.ceil(total / limit);
+        const paginationInfo = document.getElementById('audit-pagination-info');
+        if (paginationInfo) {
+            paginationInfo.textContent = `Page ${currentPage} of ${totalPages} (${total} total records)`;
+        }
+        
+        // Update pagination buttons
+        const prevBtn = document.getElementById('audit-prev-btn');
+        const nextBtn = document.getElementById('audit-next-btn');
+        if (prevBtn) prevBtn.disabled = offset === 0;
+        if (nextBtn) nextBtn.disabled = offset + limit >= total;
+        
+    } catch (error) {
+        console.error('Failed to load audit logs:', error);
+        showError('Failed to load audit logs: ' + error.message);
+    }
+}
+
+// Filter audit logs - reset to first page and reload
+async function filterAuditLogs() {
+    const offsetInput = document.getElementById('audit-offset');
+    if (offsetInput) offsetInput.value = '0';
+    await loadAuditLogs();
+}
+
+// Clear all audit log filters
+async function clearAuditFilters() {
+    const filterInputs = [
+        'audit-start-date',
+        'audit-end-date',
+        'audit-user-id',
+        'audit-action',
+        'audit-resource-type',
+        'audit-status'
+    ];
+    
+    filterInputs.forEach(id => {
+        const element = document.getElementById(id);
+        if (element) element.value = '';
+    });
+    
+    const limitInput = document.getElementById('audit-limit');
+    if (limitInput) limitInput.value = '50';
+    
+    await filterAuditLogs();
+}
+
+// Load and display audit log statistics
+async function loadAuditStats() {
+    try {
+        const stats = await apiClient.request('/api/admin/audit-logs/stats');
+        
+        // Update stat cards
+        const actionsToday = document.getElementById('audit-actions-today');
+        if (actionsToday) actionsToday.textContent = stats.actions_today || 0;
+        
+        const actionsWeek = document.getElementById('audit-actions-week');
+        if (actionsWeek) actionsWeek.textContent = stats.actions_week || 0;
+        
+        const actionsMonth = document.getElementById('audit-actions-month');
+        if (actionsMonth) actionsMonth.textContent = stats.actions_month || 0;
+        
+        const failedLogins = document.getElementById('audit-failed-logins');
+        if (failedLogins) failedLogins.textContent = stats.failed_logins || 0;
+        
+        // Populate top users table
+        const topUsersTable = document.getElementById('audit-top-users');
+        if (topUsersTable && stats.top_users) {
+            if (stats.top_users.length === 0) {
+                topUsersTable.innerHTML = '<p style="text-align: center; color: #888;">No data available.</p>';
+            } else {
+                topUsersTable.innerHTML = `
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>User</th>
+                                <th>Action Count</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${stats.top_users.map(user => `
+                                <tr>
+                                    <td>${escapeHtml(user.username)}</td>
+                                    <td><strong>${user.action_count}</strong></td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                `;
+            }
+        }
+        
+        // Populate recent critical actions table
+        const criticalActionsTable = document.getElementById('audit-critical-actions');
+        if (criticalActionsTable && stats.recent_critical) {
+            if (stats.recent_critical.length === 0) {
+                criticalActionsTable.innerHTML = '<p style="text-align: center; color: #888;">No critical actions recorded.</p>';
+            } else {
+                criticalActionsTable.innerHTML = `
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Timestamp</th>
+                                <th>User</th>
+                                <th>Action</th>
+                                <th>Resource</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${stats.recent_critical.map(action => `
+                                <tr>
+                                    <td>${new Date(action.timestamp).toLocaleString()}</td>
+                                    <td>${escapeHtml(action.username || 'N/A')}</td>
+                                    <td><strong>${formatActionName(action.action)}</strong></td>
+                                    <td>${escapeHtml(action.resource_type || 'N/A')}</td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                `;
+            }
+        }
+        
+    } catch (error) {
+        console.error('Failed to load audit stats:', error);
+        showError('Failed to load audit statistics: ' + error.message);
+    }
+}
+
+// ================== Helper Functions ==================
+
+// Format action name from snake_case to Title Case
+function formatActionName(action) {
+    if (!action) return 'N/A';
+    return action
+        .split('_')
+        .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+        .join(' ');
+}
+
+// Format audit details object into readable text
+function formatAuditDetails(details) {
+    if (!details) return 'N/A';
+    
+    try {
+        // If details is a string, try to parse it as JSON
+        const detailsObj = typeof details === 'string' ? JSON.parse(details) : details;
+        
+        if (typeof detailsObj === 'object' && detailsObj !== null) {
+            // Convert object to readable key-value pairs
+            const entries = Object.entries(detailsObj)
+                .filter(([key, value]) => value !== null && value !== undefined)
+                .map(([key, value]) => {
+                    const formattedKey = formatActionName(key);
+                    const formattedValue = typeof value === 'object' ? JSON.stringify(value) : value;
+                    return `${formattedKey}: ${formattedValue}`;
+                })
+                .join(', ');
+            
+            return truncateString(entries, 100) || 'N/A';
+        }
+        
+        return truncateString(String(detailsObj), 100);
+    } catch (error) {
+        // If parsing fails, return the string as-is
+        return truncateString(String(details), 100);
+    }
+}
+
+// Truncate long strings with ellipsis
+function truncateString(str, length) {
+    if (!str) return '';
+    if (str.length <= length) return escapeHtml(str);
+    return escapeHtml(str.substring(0, length)) + '...';
+}
+
+// ================== Audit Log Event Listeners ==================
+
+// Setup audit log event listeners (should be called from setupAdminEventListeners)
+function setupAuditLogEventListeners() {
+    // Filter button
+    const filterBtn = document.getElementById('audit-filter-btn');
+    if (filterBtn) {
+        filterBtn.addEventListener('click', async () => {
+            await filterAuditLogs();
+        });
+    }
+    
+    // Clear filters button
+    const clearBtn = document.getElementById('audit-clear-filters-btn');
+    if (clearBtn) {
+        clearBtn.addEventListener('click', async () => {
+            await clearAuditFilters();
+        });
+    }
+    
+    // Pagination - Previous button
+    const prevBtn = document.getElementById('audit-prev-btn');
+    if (prevBtn) {
+        prevBtn.addEventListener('click', async () => {
+            const offsetInput = document.getElementById('audit-offset');
+            const limitInput = document.getElementById('audit-limit');
+            if (offsetInput && limitInput) {
+                const limit = parseInt(limitInput.value) || 50;
+                const currentOffset = parseInt(offsetInput.value) || 0;
+                const newOffset = Math.max(0, currentOffset - limit);
+                offsetInput.value = newOffset.toString();
+                await loadAuditLogs();
+            }
+        });
+    }
+    
+    // Pagination - Next button
+    const nextBtn = document.getElementById('audit-next-btn');
+    if (nextBtn) {
+        nextBtn.addEventListener('click', async () => {
+            const offsetInput = document.getElementById('audit-offset');
+            const limitInput = document.getElementById('audit-limit');
+            if (offsetInput && limitInput) {
+                const limit = parseInt(limitInput.value) || 50;
+                const currentOffset = parseInt(offsetInput.value) || 0;
+                offsetInput.value = (currentOffset + limit).toString();
+                await loadAuditLogs();
+            }
+        });
+    }
+}
+
+// ================== Hospital Location Picker Functions ==================
+
+// Initialize location picker for create hospital form
+function initializeCreateHospitalLocationPicker() {
+    const pickOnMapBtn = document.getElementById('pick-location-create-btn');
+    const mapContainer = document.getElementById('create-hospital-map-container');
+    const latInput = document.getElementById('hospital-latitude');
+    const lonInput = document.getElementById('hospital-longitude');
+    
+    if (!pickOnMapBtn || !mapContainer) return;
+    
+    // Toggle map visibility
+    pickOnMapBtn.addEventListener('click', () => {
+        const isVisible = mapContainer.style.display === 'block';
+        mapContainer.style.display = isVisible ? 'none' : 'block';
+        pickOnMapBtn.textContent = isVisible ? 'Pick on Map' : 'Hide Map';
+        
+        // Initialize map if showing
+        if (!isVisible && window.initHospitalMapPicker) {
+            window.initHospitalMapPicker('create-hospital-map', (lat, lon) => {
+                if (latInput) latInput.value = lat.toFixed(6);
+                if (lonInput) lonInput.value = lon.toFixed(6);
+            });
+        }
+    });
+}
+
+// Initialize location picker for edit hospital form
+function initializeEditHospitalLocationPicker() {
+    const pickOnMapBtn = document.getElementById('pick-location-edit-btn');
+    const mapContainer = document.getElementById('edit-hospital-map-container');
+    const latInput = document.getElementById('edit-hospital-latitude');
+    const lonInput = document.getElementById('edit-hospital-longitude');
+    
+    if (!pickOnMapBtn || !mapContainer) return;
+    
+    // Toggle map visibility
+    pickOnMapBtn.addEventListener('click', () => {
+        const isVisible = mapContainer.style.display === 'block';
+        mapContainer.style.display = isVisible ? 'none' : 'block';
+        pickOnMapBtn.textContent = isVisible ? 'Pick on Map' : 'Hide Map';
+        
+        // Initialize map if showing
+        if (!isVisible && window.initHospitalMapPicker) {
+            const currentLat = parseFloat(latInput?.value) || 0;
+            const currentLon = parseFloat(lonInput?.value) || 0;
+            window.initHospitalMapPicker('edit-hospital-map', (lat, lon) => {
+                if (latInput) latInput.value = lat.toFixed(6);
+                if (lonInput) lonInput.value = lon.toFixed(6);
+            }, currentLat, currentLon);
+        }
+    });
 }
 
