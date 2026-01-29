@@ -379,6 +379,8 @@ async function editHospital(hospitalId) {
         document.getElementById('edit-hospital-code').value = hospital.code;
         document.getElementById('edit-hospital-region').value = hospital.region_id;
         document.getElementById('edit-hospital-address').value = hospital.address || '';
+        document.getElementById('edit-hospital-latitude').value = hospital.latitude || '';
+        document.getElementById('edit-hospital-longitude').value = hospital.longitude || '';
         document.getElementById('edit-hospital-form').style.display = 'block';
     } catch (error) {
         showError('Failed to load hospital: ' + error.message);
@@ -1143,6 +1145,8 @@ function setupAdminEventListeners() {
         const code = document.getElementById('edit-hospital-code').value;
         const region_id = parseInt(document.getElementById('edit-hospital-region').value);
         const address = document.getElementById('edit-hospital-address').value;
+        const latitude = document.getElementById('edit-hospital-latitude').value;
+        const longitude = document.getElementById('edit-hospital-longitude').value;
         
         if (!name || !code || !region_id) {
             showError('Please fill in all required fields');
@@ -1152,7 +1156,14 @@ function setupAdminEventListeners() {
         try {
             await apiClient.request(`/api/admin/hospitals/${hospitalId}`, {
                 method: 'PUT',
-                body: JSON.stringify({ name, code, region_id, address: address || null })
+                body: JSON.stringify({ 
+                    name, 
+                    code, 
+                    region_id, 
+                    address: address || null,
+                    latitude: latitude || null,
+                    longitude: longitude || null
+                })
             });
             
             showSuccess('Hospital updated successfully');
@@ -1168,6 +1179,8 @@ function setupAdminEventListeners() {
         const code = document.getElementById('hospital-code').value;
         const region_id = parseInt(document.getElementById('hospital-region').value);
         const address = document.getElementById('hospital-address').value;
+        const latitude = document.getElementById('hospital-latitude').value;
+        const longitude = document.getElementById('hospital-longitude').value;
         
         if (!name || !code || !region_id) {
             showError('Please fill in all required fields');
@@ -1177,7 +1190,14 @@ function setupAdminEventListeners() {
         try {
             await apiClient.request('/api/admin/hospitals', {
                 method: 'POST',
-                body: JSON.stringify({ name, code, region_id, address: address || null })
+                body: JSON.stringify({ 
+                    name, 
+                    code, 
+                    region_id, 
+                    address: address || null,
+                    latitude: latitude || null,
+                    longitude: longitude || null
+                })
             });
             
             showSuccess('Hospital created successfully');
@@ -1344,6 +1364,8 @@ function clearHospitalForm() {
     document.getElementById('hospital-code').value = '';
     document.getElementById('hospital-region').value = '';
     document.getElementById('hospital-address').value = '';
+    document.getElementById('hospital-latitude').value = '';
+    document.getElementById('hospital-longitude').value = '';
 }
 
 // Populate region dropdowns
