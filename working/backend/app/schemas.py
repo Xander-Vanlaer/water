@@ -129,6 +129,8 @@ class HospitalCreate(BaseModel):
     code: str = Field(..., min_length=1, max_length=50)
     region_id: int
     address: Optional[str] = None
+    latitude: Optional[float] = Field(None, ge=-90, le=90)
+    longitude: Optional[float] = Field(None, ge=-180, le=180)
 
 
 class HospitalUpdate(BaseModel):
@@ -137,6 +139,8 @@ class HospitalUpdate(BaseModel):
     code: Optional[str] = Field(None, min_length=1, max_length=50)
     region_id: Optional[int] = None
     address: Optional[str] = None
+    latitude: Optional[float] = Field(None, ge=-90, le=90)
+    longitude: Optional[float] = Field(None, ge=-180, le=180)
 
 
 class HospitalResponse(BaseModel):
@@ -146,6 +150,9 @@ class HospitalResponse(BaseModel):
     code: str
     region_id: int
     address: Optional[str]
+    latitude: Optional[float]
+    longitude: Optional[float]
+    map_zoom: int
     created_at: datetime
     
     class Config:
@@ -257,6 +264,65 @@ class AllowedEmailResponse(BaseModel):
     email: str
     created_at: datetime
     created_by: Optional[int]
+    
+    class Config:
+        from_attributes = True
+
+
+# Audit Log Schemas
+class AuditLogResponse(BaseModel):
+    """Schema for audit log response"""
+    id: int
+    user_id: Optional[int]
+    username: Optional[str]
+    action: str
+    resource_type: Optional[str]
+    resource_id: Optional[str]
+    details: Optional[Dict[str, Any]]
+    ip_address: Optional[str]
+    user_agent: Optional[str]
+    timestamp: datetime
+    status: str
+    
+    class Config:
+        from_attributes = True
+
+
+class AuditLogFilter(BaseModel):
+    """Schema for filtering audit logs"""
+    user_id: Optional[int] = None
+    action: Optional[str] = None
+    resource_type: Optional[str] = None
+    start_date: Optional[datetime] = None
+    end_date: Optional[datetime] = None
+    status: Optional[str] = None
+    limit: int = Field(default=100, le=1000)
+    offset: int = Field(default=0, ge=0)
+
+
+class AuditLogStatsResponse(BaseModel):
+    """Schema for audit log statistics"""
+    total_actions: int
+    actions_today: int
+    actions_this_week: int
+    actions_this_month: int
+    top_users: list
+    recent_critical_actions: list
+    failed_logins_count: int
+
+
+# Hospital Map Schemas
+class HospitalMapResponse(BaseModel):
+    """Schema for hospital map data"""
+    id: int
+    name: str
+    code: str
+    latitude: Optional[float]
+    longitude: Optional[float]
+    sensor_count: int = 0
+    last_reading_time: Optional[datetime] = None
+    region_id: int
+    region_name: str
     
     class Config:
         from_attributes = True
