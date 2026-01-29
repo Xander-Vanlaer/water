@@ -9,7 +9,7 @@ class Settings(BaseSettings):
     """Application settings loaded from environment variables"""
     
     # Application
-    APP_NAME: str = "Secure Full-Stack Application"
+    APP_NAME: str = "Clean Water in Hospital"
     DEBUG: bool = False
     
     # Security
